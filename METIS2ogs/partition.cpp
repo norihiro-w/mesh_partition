@@ -297,7 +297,18 @@ int main(int argc, char* argv[])
       case ogs2metis:
          s_buff = fname+".mesh";
          ofile.open(s_buff.c_str(), ios::out | ios::trunc );
+         if(quad)
+         {
+            a_mesh->GenerateHighOrderNodes();
+            a_mesh->setOrder(true);
+         }
          a_mesh->Write2METIS(ofile);
+         {
+             string vtk_name = fname+".vtk";
+             ofstream of_vtk(vtk_name.c_str());
+             a_mesh->WriteVTK_Vertex(of_vtk);
+             of_vtk.close();
+         }
 
          break;
       case metis2ogs:
