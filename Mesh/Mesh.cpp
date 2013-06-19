@@ -1632,8 +1632,10 @@ void Mesh::Write2METIS(ostream& os)
    os<<e_type;
 #endif
    os<<endl;
-   for(long i=0; i<(long)elem_vector.size(); i++)
+   for(long i=0; i<(long)elem_vector.size(); i++) {
+      elem_vector[i]->setOrder(useQuadratic);
       elem_vector[i]->Write_index(os);
+   }
 }
 
 
