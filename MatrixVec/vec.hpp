@@ -5,11 +5,9 @@
  programming:
  05/2005  WW
 ==========================================================================*/
-#include "vec.h"
 
 namespace Math_Group
 {
-using namespace std;
 
 /*========================================================================
 MathLib-Method:
@@ -84,18 +82,19 @@ template<class T> void vec<T>:: operator = (const vec<T>& v)
    for (int i=0; i<size; i++) entry[i] = v[i];
 }
 
-template<class T> void vec<T>:: Write(ostream& os) const
+template<class T> void vec<T>:: Write(std::ostream& os) const
 {
    for (int i=0; i<size; i++)
       os<< entry[i]<<"  ";
-   os<<endl;
+   os<<std::endl;
 }
 
 
 //2.
-vec<void*>:: vec (const int argSize):size(argSize)
+template <class T>
+vec<T*>:: vec (const int argSize):size(argSize)
 {
-   entry = new void*[argSize];
+   entry = new T*[argSize];
 #ifdef gDEBUG
    if (!entry)
    {
@@ -105,7 +104,8 @@ vec<void*>:: vec (const int argSize):size(argSize)
 #endif
 }
 
-vec<void*>:: vec (const vec<void*>& v)
+template <class T>
+vec<T*>:: vec (const vec<T*>& v)
 {
    size = v.Size();
    resize(size);
@@ -122,12 +122,14 @@ vec<void*>:: vec (const vec<void*>& v)
 
 }
 
-vec<void*>::~vec()
+template <class T>
+vec<T*>::~vec()
 {
    delete[] entry;
    entry = 0;
 }
-void vec<void*>:: resize(const int argSize)
+template <class T>
+void vec<T*>:: resize(const int argSize)
 {
    if(size>0)
    {
@@ -135,7 +137,7 @@ void vec<void*>:: resize(const int argSize)
       entry=NULL;
    }
    size = argSize;
-   entry = new void*[argSize];
+   entry = new T*[argSize];
 #ifdef gDEBUG
    if (!entry)
    {
@@ -145,14 +147,16 @@ void vec<void*>:: resize(const int argSize)
 #endif
 }
 
-void vec<void*>:: Write(ostream& os) const
+template <class T>
+void vec<T*>:: Write(std::ostream& os) const
 {
    for (int i=0; i<size; i++)
       os<< entry[i]<<"  ";
-   os<<endl;
+   os<<std::endl;
 }
 
-void vec<void*>:: operator = (const vec<void*>& v)
+template <class T>
+void vec<T*>:: operator = (const vec<T*>& v)
 {
 #ifdef gDEBUG
    if (size!=v.Size())
@@ -163,29 +167,9 @@ void vec<void*>:: operator = (const vec<void*>& v)
 #endif
    for (int i=0; i<size; i++) entry[i] = v.entry[i];
 }
-
-//3.
-template<class T>  void vec<T*>:: operator = (const vec<T*>& v)
-{
-#ifdef gDEBUG
-   if (size!=v.Size())
-   {
-      cout << "\n*** Sizes do not match in vec ";
-      abort();
-   }
-#endif
-   for (int i=0; i<size; i++) entry[i] = v.entry[i];
-}
-
 
 
 }// Namespace
-
-using Math_Group::vec;
-
-template class vec<int>;
-template class vec<long>;
-template class vec<double>;
 
 // End of class Matrix
 //==========================================================================
