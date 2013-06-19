@@ -30,7 +30,7 @@ Mesh::Mesh(bool quad)
    coordinate_system = 1;
    axisymmetry=false;
    max_ele_dim = 0;
-
+   NodesNumber_Linear=NodesNumber_Quadratic=0;
 }
 
 Mesh::~Mesh()
@@ -188,11 +188,12 @@ void Mesh::ConstructGrid()
    //Elem->nodes not initialized
 
    e_size = (long)elem_vector.size();
-   NodesNumber_Linear= (long)node_vector.size();
+   if (NodesNumber_Linear==0)
+       NodesNumber_Linear= (long)node_vector.size();
 
    //----------------------------------------------------------------------
    // set neighbors of node
-   ConnectedElements2Node();
+   ConnectedElements2Node(useQuadratic);
    //----------------------------------------------------------------------
 
    //----------------------------------------------------------------------
@@ -200,7 +201,8 @@ void Mesh::ConstructGrid()
    for(e=0; e<e_size; e++)
    {
       thisElem0 = elem_vector[e];
-      nnodes0 = thisElem0->nnodes; // Number of nodes for linear element
+      thisElem0->setOrder(useQuadratic);
+      nnodes0 = thisElem0->getNodesNumber(useQuadratic);
       thisElem0->getNodeIndeces(node_index_glb0);
       thisElem0->getNeighbors(Neighbors0);
       for(i=0; i<nnodes0; i++) // Nodes
@@ -323,8 +325,8 @@ void Mesh::ConstructGrid()
 
 #endif  //BUILD_MESH_EDGE
 
-	  // set nodes
-      thisElem0->setOrder(false);
+//	  // set nodes
+//      thisElem0->setOrder(false);
       // Resize is true
       thisElem0->setNodes(e_nodes0, true);
    }// Over elements
@@ -478,6 +480,7 @@ void Mesh::GenerateHighOrderNodes()
    Edge *thisEdge=NULL;
 #endif
    //----------------------------------------------------------------------
+   NodesNumber_Linear= (long)node_vector.size();
    // Loop over elements
    e_size = (long)elem_vector.size();
    for(e=0; e<e_size; e++)
@@ -742,7 +745,7 @@ void Mesh::ConstructSubDomain_by_Elements(const string fname, const int num_part
       for(j=0; j<(long)elem_vector.size(); j++)
       {
          ele = elem_vector[j];
-         for(kk=0; kk<ele->getNodesNumber(); kk++)
+         for(kk=0; kk<ele->getNodesNumber(useQuadratic); kk++)
          {
             ele->setLocalNodeIndex(kk, -1);
             ele->AllocateLocalIndexVector();
@@ -755,7 +758,7 @@ void Mesh::ConstructSubDomain_by_Elements(const string fname, const int num_part
          //ele->AllocateLocalIndexVector();
          if(ele->getDomainIndex()==k)
          {
-            for(kk=0; kk<ele->getNodesNumber(); kk++)
+            for(kk=0; kk<ele->getNodesNumber(useQuadratic); kk++)
             {
                done = false;
                n_index = ele->getLocalNodeIndex(kk);
@@ -813,7 +816,7 @@ void Mesh::ConstructSubDomain_by_Elements(const string fname, const int num_part
             //GMSH  ele->WriteGmsh(test_out, k+1);
 
             test_out<<j<<deli<<ele->getPatchIndex()<<deli<<ele->getName()<<deli;
-            for(kk=0; kk<ele->getNodesNumber(); kk++)
+            for(kk=0; kk<ele->getNodesNumber(useQuadratic); kk++)
                test_out<< ele->getDomNodeIndex(kk)<<deli;
             test_out<<endl;
          }
@@ -951,13 +954,14 @@ void Mesh::ConstructSubDomain_by_Nodes(const string fname, const string fpath, c
    }
 
 
-   long nn = static_cast<long>(node_vector.size());
+   const long nn = static_cast<long>(node_vector.size());
+   const long nnodes_in_usage = useQuadratic ? NodesNumber_Quadratic : NodesNumber_Linear;
 
    vector<bool> sdom_marked(nn);
-   vector<long> dom_idx(NodesNumber_Linear);
+   vector<long> dom_idx(nnodes_in_usage);
 
    // Re-ordered nodes of the whole mesh for ouput
-   for(i=0; i<NodesNumber_Linear; i++)
+   for(i=0; i<dom_idx.size(); i++)
    {
       npart_in>>dom>>ws;
       dom_idx[i] = dom;
@@ -971,9 +975,13 @@ void Mesh::ConstructSubDomain_by_Nodes(const string fname, const string fpath, c
    string name_f = fname+"_partitioned_"+ s_nparts + ".msh";
    fstream os_subd(name_f.c_str(), ios::out|ios::trunc );
    name_f = "Subdomain mesh "
-           "(Nodes;  Nodes_linear; Elements; Ghost elements; Nodes of Linear elements; Nodes of quadratic elements) "
-            "Nodes of Linear whole elements; Nodes of whole quadratic elements; "
+           "(Domain nodes(quad); Domain nodes(linear); Inner elements; Ghost elements; Internal nodes(linear); Internal nodes(quad)) "
+            "Global nodes(linear); Global nodes(quad); "
        "Total integer variables of elements;Total integer variables of ghost elements  ";
+//   name_f = "Subdomain mesh "
+//           "(Nodes;  Nodes_linear; Elements; Ghost elements; Nodes of Linear elements; Nodes of quadratic elements) "
+//            "Nodes of Linear whole elements; Nodes of whole quadratic elements; "
+//       "Total integer variables of elements;Total integer variables of ghost elements  ";
    os_subd<<name_f<<endl;
    os_subd<<num_parts<<endl;
    setw(14);
@@ -1004,7 +1012,9 @@ void Mesh::ConstructSubDomain_by_Nodes(const string fname, const string fpath, c
 //      vector<Node*> sbd_nodes;
 	  nnodes_sdom_start[idom] = nnodes_previous_sdom;
 
-      for(j=0; j<NodesNumber_Linear; j++)
+      long size_sbd_nodes_l = 0; // Nodes in this domain of linear element
+
+      for(j=0; j<static_cast<long>(dom_idx.size()); j++)
       {
          if(dom_idx[j] == idom && (!sdom_marked[j]))
             //if(dom_idx[j] == idom)
@@ -1012,16 +1022,18 @@ void Mesh::ConstructSubDomain_by_Nodes(const string fname, const string fpath, c
 
             sbd_nodes.push_back(node_vector[j]);
             sdom_marked[j] = true;  // avoid other subdomain use this node
+            if (j<NodesNumber_Linear)
+                size_sbd_nodes_l++;
          }
       }
 
-      nnodes_sdom_linear_elements[idom] = static_cast<long>(sbd_nodes.size());
-      nnodes_sdom_quadratic_elements[idom] = nnodes_sdom_linear_elements[idom];
+      nnodes_sdom_linear_elements[idom] = static_cast<long>(sbd_nodes.size()) - size_sbd_nodes_l;
+      nnodes_sdom_quadratic_elements[idom] = static_cast<long>(sbd_nodes.size());
 
-      long size_sbd_nodes = nnodes_sdom_linear_elements[idom] - nnodes_previous_sdom;
-      long size_sbd_nodes0 = size_sbd_nodes; // Nodes in this domain
-      long size_sbd_nodes_l = size_sbd_nodes; // Nodes in this domain of linear element
-      long size_sbd_nodes_h = size_sbd_nodes; // Nodes in this domain of quadratic element
+      long size_sbd_nodes = static_cast<long>(sbd_nodes.size()) - nnodes_previous_sdom;
+      const long size_sbd_nodes0 = size_sbd_nodes; // Nodes in this domain
+      const long size_sbd_nodes_h = size_sbd_nodes; // Nodes in this domain of quadratic element
+
 
 
       vector<Elem*> in_subdom_elements;
@@ -1060,7 +1072,7 @@ void Mesh::ConstructSubDomain_by_Nodes(const string fname, const string fpath, c
 
             vector<int> ng_nodes; // non ghost nodes in ghost elements
             vector<int> g_nodes; // ghost nodes in ghost elements
-            for(kk=0; kk<a_elem->getNodesNumber(); kk++)
+            for(kk=0; kk<a_elem->getNodesNumber(useQuadratic); kk++)
             {
                if(a_elem->getNode(kk)->getStatus())
                {
@@ -1075,7 +1087,7 @@ void Mesh::ConstructSubDomain_by_Nodes(const string fname, const string fpath, c
             {
                in_subdom_elements.push_back(a_elem);
             }
-            else if(g_nodes.size() != static_cast<size_t>(a_elem->getNodesNumber()))
+            else if(g_nodes.size() != static_cast<size_t>(a_elem->getNodesNumber(useQuadratic)))
             {
                ghost_subdom_elements.push_back(a_elem);
 
@@ -1094,102 +1106,6 @@ void Mesh::ConstructSubDomain_by_Nodes(const string fname, const string fpath, c
          }
       }
 
-      // For quadratic element, add additional nodes here
-      // Add  non ghost nodes in ghost elements as well
-      if(is_quad)
-      {
-         long nei = static_cast<long>(in_subdom_elements.size());
-         for(j=0; j<nei; j++)
-         {
-            a_elem = in_subdom_elements[j];
-            for(k=a_elem->nnodes; k<a_elem->nnodesHQ; k++)
-               a_elem->nodes[k]->Marking(false);
-         }
-
-         long neg = static_cast<long>(ghost_subdom_elements.size());
-         for(j=0; j<neg; j++)
-         {
-            a_elem = ghost_subdom_elements[j];
-            for(k=0; k<a_elem->nnodesHQ; k++)
-               a_elem->nodes[k]->Marking(false);
-         }
-
-         long new_node_idx = size_sbd_nodes0 + node_id_shift;
-         // Add nodes for quadrtic elements in this subdomain zone
-         for(j=0; j<nei; j++)
-         {
-            a_elem = in_subdom_elements[j];
-            for(k=a_elem->nnodes; k<a_elem->nnodesHQ; k++)
-            {
-               a_node = a_elem->nodes[k];
-			   i = a_elem->nodes[k]->index;
-               if(sdom_marked[i]) // Already in other subdomains
-                  continue;
-
-               if(a_node->getStatus()) // Already added
-                  continue;
-
-
-               // Add new
-               sdom_marked[i] = true;
-
-               a_node->index = new_node_idx;
-               a_node->local_index = a_node->index;
-               sbd_nodes.push_back(a_node);
-               a_node->Marking(true);
-               new_node_idx++;
-            }
-         }
-
-         //-------------------------------------------
-         // Check ghost elements
-         // Add nodes for quadrtic elements in ghost zone
-
-         for(j=0; j<neg; j++)
-         {
-            a_elem = ghost_subdom_elements[j];
-
-            for(k=a_elem->nnodes; k<a_elem->nnodesHQ; k++)
-            {
-               a_node = a_elem->nodes[k];
-               // Since a_elem->nodes_index[k] is not touched
-			   i = a_elem->nodes[k]->index;
-               if(sdom_marked[i]) // Already in other subdomains
-                  continue;
-
-               if(a_node->getStatus()) // Already added
-                  continue;
-
-               // Add new
-               sdom_marked[i] = true;
-
-               a_node->index = new_node_idx;
-               a_node->local_index = a_node->index;
-               sbd_nodes.push_back(a_node);
-               a_node->Marking(true);
-               new_node_idx++;
-            }
-         }
-
-         // Make non-ghost nodes in ghost elements
-         for(j=0; j<neg; j++)
-         {
-            a_elem = ghost_subdom_elements[j];
-
-            for(k=0; k<a_elem->nnodesHQ; k++)
-            {
-               if(a_elem->nodes[k]->getStatus())
-               {
-                  a_elem->ghost_nodes.push_back(k);
-               }
-            }
-
-         }
-		 nnodes_sdom_quadratic_elements[idom] = static_cast<long>(sbd_nodes.size());
-         size_sbd_nodes0 = nnodes_sdom_quadratic_elements[idom]  - nnodes_previous_sdom;
-         size_sbd_nodes_h = size_sbd_nodes0;
-      }
-
 	  /// Number of subdomain nodes for linear element 
 	  int sdom_nnodes = size_sbd_nodes_l;
       //-----------------------------------------------
@@ -1201,10 +1117,10 @@ void Mesh::ConstructSubDomain_by_Nodes(const string fname, const string fpath, c
          for(k=0; k<a_elem->getNodesNumber(is_quad); k++)
             a_elem->nodes[k]->Marking(false);
 
-         // Existing nodes
+         // mark internal nodes
          const int ngh_nodes = static_cast<int>(a_elem->ghost_nodes.size());
          for(k=0; k<ngh_nodes; k++)
-            a_elem->nodes[a_elem->ghost_nodes[k]]->Marking(true);
+            a_elem->nodes[a_elem->ghost_nodes[k]]->Marking(true); //ghost_nodes actually hold internal nodes
       }
       //
       long new_node_idx = size_sbd_nodes0 + node_id_shift;
@@ -1221,8 +1137,8 @@ void Mesh::ConstructSubDomain_by_Nodes(const string fname, const string fpath, c
             sbd_nodes.push_back(a_node);
             new_node_idx++;
 
-            if(k < a_elem->getNodesNumber())
-				sdom_nnodes++;
+            if(k < a_elem->getNodesNumber(false))
+				sdom_nnodes++; // linear nodes
          }
 
       }
@@ -1259,10 +1175,14 @@ void Mesh::ConstructSubDomain_by_Nodes(const string fname, const string fpath, c
       //os_subd<<" $NODES\n"<<size_sbd_nodes<<endl;
 
 
-	  name_f = "Subdomain mesh "
-           "(Nodes;  Nodes_linear; Elements; Ghost elements; Nodes of Linear elements; Nodes of quadratic elements) "
-            "Nodes of Linear whole elements; Nodes of whole quadratic elements; "
-       "Total integer variables of elements;Total integer variables of ghost elements  ";
+      name_f = "Subdomain mesh "
+              "(Domain nodes(quad); Domain nodes(linear); Inner elements; Ghost elements; Internal nodes(linear); Internal nodes(quad)) "
+               "Global nodes(linear); Global nodes(quad); "
+          "Total integer variables of elements;Total integer variables of ghost elements  ";
+//	  name_f = "Subdomain mesh "
+//           "(Nodes;  Nodes_linear; Elements; Ghost elements; Nodes of Linear elements; Nodes of quadratic elements) "
+//            "Nodes of Linear whole elements; Nodes of whole quadratic elements; "
+//       "Total integer variables of elements;Total integer variables of ghost elements  ";
       os_subd<<name_f<<endl;
 #endif
       os_subd<<size_sbd_nodes<<deli<<sdom_nnodes<<deli<<in_subdom_elements.size()
