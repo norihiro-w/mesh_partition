@@ -1571,6 +1571,37 @@ void  Mesh::WriteVTK_Elements_of_Subdomain(std::ostream& os, std::vector<Elem*>&
 
 }
 
+void  Mesh::WriteVTK_Vertex(std::ostream& os)
+{
+   //-----------------------------------------------------------
+   //  VTK output
+   WriteVTK_Nodes(os);
+
+   os<<"\nCELLS "<<node_vector.size()<<" " <<2*node_vector.size()<<endl;
+
+   // CELLs
+   for(size_t i=0; i<node_vector.size(); i++)
+   {
+      os<<"1 "<<i << "\n";
+   }
+   os << endl;
+
+   // CELL types
+   os << "CELL_TYPES " << node_vector.size() << endl;
+   for(size_t i=0; i<node_vector.size(); i++)
+   {
+       os<<"1 \n";
+   }
+   os << endl;
+
+   // Partition
+   os<<"POINT_DATA "<<node_vector.size()<<endl;
+   os<<"SCALARS Partition int 1\nLOOKUP_TABLE default"<<endl;
+   for(size_t i=0; i<node_vector.size(); i++)
+      os<<"0\n";
+
+}
+
 void Mesh::Write2METIS(ostream& os)
 {
    os<<(long)elem_vector.size()<<" ";

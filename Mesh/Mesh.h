@@ -31,6 +31,7 @@ class Mesh
       void ReadGridGeoSys(std::istream& is = std::cin);
 
       void Write2METIS(std::ostream& os);
+      void WriteVTK_Vertex(std::ostream& os);
       void WriteVTK_Nodes(std::ostream& os);
       void WriteVTK_Nodes(std::ostream& os, std::vector<Node*>& nod_vec, const size_t start = 0);
       void WriteVTK_Elements_of_Subdomain(std::ostream& os, std::vector<Elem*>& ele_vec,
