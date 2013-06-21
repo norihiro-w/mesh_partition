@@ -1009,30 +1009,26 @@ void Mesh::ConstructSubDomain_by_Nodes(const string fname, const string fpath, c
       nmb_element_idxs = 0;
       nmb_element_idxs_g = 0;
 
-//      vector<Node*> sbd_nodes;
 	  nnodes_sdom_start[idom] = nnodes_previous_sdom;
 
-      long size_sbd_nodes_l = 0; // Nodes in this domain of linear element
-
+      vector<Node*> internal_nodes; // both linear and quad
+      vector<Node*> internal_quad_nodes; // only quad
       for(j=0; j<static_cast<long>(dom_idx.size()); j++)
       {
          if(dom_idx[j] == idom && (!sdom_marked[j]))
-            //if(dom_idx[j] == idom)
          {
-
-            sbd_nodes.push_back(node_vector[j]);
+            if (j>=NodesNumber_Linear) {
+            	internal_quad_nodes.push_back(node_vector[j]);
+            }
+            internal_nodes.push_back(node_vector[j]);
             sdom_marked[j] = true;  // avoid other subdomain use this node
-            if (j<NodesNumber_Linear)
-                size_sbd_nodes_l++;
          }
       }
 
-      nnodes_sdom_linear_elements[idom] = static_cast<long>(sbd_nodes.size()) - size_sbd_nodes_l;
-      nnodes_sdom_quadratic_elements[idom] = static_cast<long>(sbd_nodes.size());
+      nnodes_sdom_linear_elements[idom] = static_cast<long>(internal_nodes.size() - internal_quad_nodes.size());
+      nnodes_sdom_quadratic_elements[idom] = static_cast<long>(internal_nodes.size());
 
-      long size_sbd_nodes = static_cast<long>(sbd_nodes.size()) - nnodes_previous_sdom;
-      const long size_sbd_nodes0 = size_sbd_nodes; // Nodes in this domain
-      const long size_sbd_nodes_h = size_sbd_nodes; // Nodes in this domain of quadratic element
+      const long size_sbd_nodes0 = static_cast<long>(internal_nodes.size()); // Nodes in this domain
 
 
 
@@ -1045,19 +1041,18 @@ void Mesh::ConstructSubDomain_by_Nodes(const string fname, const string fpath, c
       for(j=0; j<ne_total; j++)
          elem_vector[j]->Marking(false);
       // Only select nodes in this subdomain
-      for(j=0; j<size_sbd_nodes0; j++)
+      for(j=0; j<internal_nodes.size(); j++)
       {
-         a_node = sbd_nodes[j + nnodes_previous_sdom];
-         a_node->index = j + node_id_shift;
-		 a_node->local_index = a_node->index;
-         a_node ->Marking(true);
+         a_node = internal_nodes[j];
+         a_node->Marking(true);
+		 a_node->local_index = j + node_id_shift; //internal node id should be continuous
       }
 
 
       /// Find the elements in this subdomain.
-      for(j=0; j<size_sbd_nodes0; j++)
+      for(j=0; j<internal_nodes.size(); j++)
       {
-         a_node = sbd_nodes[j + nnodes_previous_sdom];
+         a_node = internal_nodes[j];
 
          // Search the elements connected to this nodes
 		 const long ne_rel = static_cast<long>(a_node->ElementsRelated.size()); 
@@ -1107,7 +1102,6 @@ void Mesh::ConstructSubDomain_by_Nodes(const string fname, const string fpath, c
       }
 
 	  /// Number of subdomain nodes for linear element 
-	  int sdom_nnodes = size_sbd_nodes_l;
       //-----------------------------------------------
       // Add nodes in ghost elements
       const long ne_g = static_cast<long>(ghost_subdom_elements.size());
@@ -1123,27 +1117,52 @@ void Mesh::ConstructSubDomain_by_Nodes(const string fname, const string fpath, c
             a_elem->nodes[a_elem->ghost_nodes[k]]->Marking(true); //ghost_nodes actually hold internal nodes
       }
       //
-      long new_node_idx = size_sbd_nodes0 + node_id_shift;
+      vector<Node*> dom_ghost_linear_nodes, dom_ghost_quad_nodes;
       for(j=0; j<ne_g; j++)
       {
          a_elem = ghost_subdom_elements[j];
          for(k=0; k<a_elem->getNodesNumber(is_quad); k++)
          {
             a_node = a_elem->nodes[k];
-            if(a_node->getStatus())
+            if(a_node->getStatus()) // ghost nodes are unmarked
                continue;
             a_node->Marking(true);
-            a_node->index = new_node_idx;
-            sbd_nodes.push_back(a_node);
-            new_node_idx++;
-
-            if(k < a_elem->getNodesNumber(false))
-				sdom_nnodes++; // linear nodes
+            if (k<a_elem->getNodesNumber(false)) {
+            	dom_ghost_linear_nodes.push_back(a_node);
+            } else {
+            	dom_ghost_quad_nodes.push_back(a_node);
+            }
          }
 
       }
 
-      size_sbd_nodes = static_cast<long>(sbd_nodes.size()) - nnodes_previous_sdom;
+      // make a list of domain nodes
+      long new_node_idx = node_id_shift;
+      // add internal linear
+      for (j=0; j<internal_nodes.size() - internal_quad_nodes.size(); j++) {
+    	  a_node = internal_nodes[j];
+    	  a_node->index = new_node_idx++; //local node id
+    	  sbd_nodes.push_back(a_node);
+      }
+      // add ghost linear
+      for (j=0; j<dom_ghost_linear_nodes.size(); j++) {
+    	  a_node = dom_ghost_linear_nodes[j];
+    	  a_node->index = new_node_idx++;
+    	  sbd_nodes.push_back(a_node);
+      }
+      // add internal quad
+      for (j=0; j<internal_quad_nodes.size(); j++) {
+    	  a_node = internal_quad_nodes[j];
+    	  a_node->index = new_node_idx++;
+    	  sbd_nodes.push_back(a_node);
+      }
+      // add ghost quad
+      for (j=0; j<dom_ghost_quad_nodes.size(); j++) {
+    	  a_node = dom_ghost_quad_nodes[j];
+    	  a_node->index = new_node_idx++;
+    	  sbd_nodes.push_back(a_node);
+      }
+      const long size_sbd_nodes = static_cast<long>(sbd_nodes.size()) - nnodes_previous_sdom;
 
 
       // Count the total integer variables of this subdomain
@@ -1185,8 +1204,8 @@ void Mesh::ConstructSubDomain_by_Nodes(const string fname, const string fpath, c
 //       "Total integer variables of elements;Total integer variables of ghost elements  ";
       os_subd<<name_f<<endl;
 #endif
-      os_subd<<size_sbd_nodes<<deli<<sdom_nnodes<<deli<<in_subdom_elements.size()
-			<<deli<<ne_g<<deli<<size_sbd_nodes_l<<deli<<size_sbd_nodes_h
+      os_subd<<size_sbd_nodes<<deli<<size_sbd_nodes-internal_quad_nodes.size()-dom_ghost_quad_nodes.size()<<deli<<in_subdom_elements.size()
+			<<deli<<ne_g<<deli<<internal_nodes.size()-internal_quad_nodes.size()<<deli<<internal_nodes.size()
              <<deli<<NodesNumber_Linear<<deli<<NodesNumber_Quadratic
              <<deli<<nmb_element_idxs<<deli<<nmb_element_idxs_g<<endl;
 
