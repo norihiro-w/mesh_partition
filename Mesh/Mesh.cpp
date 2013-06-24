@@ -475,8 +475,8 @@ void Mesh::GenerateHighOrderNodes()
    vec<Node*> e_nodes0(20);
    Elem *thisElem0=NULL;
    Elem *thisElem=NULL;
-   Edge *thisEdge0=NULL;
 #ifdef BUILD_MESH_EDGE
+   Edge *thisEdge0=NULL;
    Edge *thisEdge=NULL;
 #endif
    //----------------------------------------------------------------------
@@ -961,7 +961,7 @@ void Mesh::ConstructSubDomain_by_Nodes(const string fname, const string fpath, c
    vector<long> dom_idx(nnodes_in_usage);
 
    // Re-ordered nodes of the whole mesh for ouput
-   for(i=0; i<dom_idx.size(); i++)
+   for(i=0; i<static_cast<long>(dom_idx.size()); i++)
    {
       npart_in>>dom>>ws;
       dom_idx[i] = dom;
@@ -1041,7 +1041,7 @@ void Mesh::ConstructSubDomain_by_Nodes(const string fname, const string fpath, c
       for(j=0; j<ne_total; j++)
          elem_vector[j]->Marking(false);
       // Only select nodes in this subdomain
-      for(j=0; j<internal_nodes.size(); j++)
+      for(j=0; j<static_cast<long>(internal_nodes.size()); j++)
       {
          a_node = internal_nodes[j];
          a_node->Marking(true);
@@ -1050,7 +1050,7 @@ void Mesh::ConstructSubDomain_by_Nodes(const string fname, const string fpath, c
 
 
       /// Find the elements in this subdomain.
-      for(j=0; j<internal_nodes.size(); j++)
+      for(j=0; j<static_cast<long>(internal_nodes.size()); j++)
       {
          a_node = internal_nodes[j];
 
@@ -1139,25 +1139,25 @@ void Mesh::ConstructSubDomain_by_Nodes(const string fname, const string fpath, c
       // make a list of domain nodes
       long new_node_idx = node_id_shift;
       // add internal linear
-      for (j=0; j<internal_nodes.size() - internal_quad_nodes.size(); j++) {
+      for (j=0; j<static_cast<long>(internal_nodes.size() - internal_quad_nodes.size()); j++) {
     	  a_node = internal_nodes[j];
     	  a_node->index = new_node_idx++; //local node id
     	  sbd_nodes.push_back(a_node);
       }
       // add ghost linear
-      for (j=0; j<dom_ghost_linear_nodes.size(); j++) {
+      for (j=0; j<static_cast<long>(dom_ghost_linear_nodes.size()); j++) {
     	  a_node = dom_ghost_linear_nodes[j];
     	  a_node->index = new_node_idx++;
     	  sbd_nodes.push_back(a_node);
       }
       // add internal quad
-      for (j=0; j<internal_quad_nodes.size(); j++) {
+      for (j=0; j<static_cast<long>(internal_quad_nodes.size()); j++) {
     	  a_node = internal_quad_nodes[j];
     	  a_node->index = new_node_idx++;
     	  sbd_nodes.push_back(a_node);
       }
       // add ghost quad
-      for (j=0; j<dom_ghost_quad_nodes.size(); j++) {
+      for (j=0; j<static_cast<long>(dom_ghost_quad_nodes.size()); j++) {
     	  a_node = dom_ghost_quad_nodes[j];
     	  a_node->index = new_node_idx++;
     	  sbd_nodes.push_back(a_node);
