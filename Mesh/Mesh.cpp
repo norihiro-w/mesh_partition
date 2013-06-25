@@ -1364,27 +1364,50 @@ void Mesh::ConstructSubDomain_by_Nodes(const string fname, const string fpath, c
 
    // Output renumbered mesh
    os<<"#FEM_MSH\n   $PCS_TYPE\n    NULL"<<endl;
-   os<<" $NODES\n"<<NodesNumber_Linear<<endl;
+   os<<" $NODES\n"<<NodesNumber_Quadratic<<endl;
+   std::vector<Node*> vec_sorted_nodes(NodesNumber_Quadratic);
    for(int idom=0; idom<num_parts; idom++)
    {
       const long start = nnodes_sdom_start[idom];
-      const long end = nnodes_sdom_linear_elements[idom];
+//      const long end = nnodes_sdom_linear_elements[idom];
+      if(idom < num_parts-1)
+		  end = nnodes_sdom_start[idom+1];
+	  else
+          end = static_cast<long>(sbd_nodes.size());
       for(i=start; i<end; i++)
       {
          a_node = sbd_nodes[i];
 		 a_node->index = a_node->local_index;					
-         a_node->Write(os);
+		 vec_sorted_nodes[a_node->index] = a_node;
+         //a_node->Write(os);
 	  }
    }
+   for (size_t i=0; i<vec_sorted_nodes.size(); i++)
+	   vec_sorted_nodes[i]->Write(os);
    sbd_nodes.clear();
 
    os<<" $ELEMENTS\n"<<elem_vector.size()<<endl;
    for(size_t e=0; e<elem_vector.size(); e++)
    {
-      elem_vector[e]->WriteGSmsh(os);
+      elem_vector[e]->WriteGSmsh(os, is_quad);
    }
    os<<"#STOP"<<endl;
    os.close();
+
+
+   if(osdom){
+      //-----------------------------------------------------------
+      /// VTK output
+      // Elements in this subdomain
+      f_iparts = fname + "_renum_"+ s_nparts +".vtk";
+      //f_iparts = fname+"_"+str_buf+".vtk";
+      ofstream os(f_iparts.c_str(), ios::out|ios::trunc);
+
+      WriteVTK_Nodes(os, vec_sorted_nodes, 0);
+      WriteVTK_Elements_of_Subdomain(os, elem_vector, 0, 0);
+      //-----------------------------------------------------------
+
+   }
 }
 
 // 02.2012. WW
