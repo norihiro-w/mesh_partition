@@ -960,32 +960,38 @@ void Mesh::ConstructSubDomain_by_Nodes(const string fname, const string fpath, c
    // Read a METIS node partitioned file
    //--------------------------------------------------------------------------
    const string s_nparts = number2str(num_parts);
-   f_iparts = fname + ".mesh.npart." + s_nparts;
-   //o_part_msh = fname + "." + s_nparts +"mesh";
-
-
-   ifstream npart_in(f_iparts.c_str());
-   if(!npart_in.is_open())
-   {
-      cerr<<("Error: cannot open .npart file . It may not exist !");
-      exit(1);
-   }
-
-
    const long nn = static_cast<long>(node_vector.size());
-
    vector<bool> sdom_marked(nn);
    vector<long> dom_idx(NodesNumber_Linear);
+   if (num_parts>1) {
+	   f_iparts = fname + ".mesh.npart." + s_nparts;
+	   //o_part_msh = fname + "." + s_nparts +"mesh";
 
-   // Re-ordered nodes of the whole mesh for ouput
-   for(i=0; i<NodesNumber_Linear; i++)
-   {
-      npart_in>>dom>>ws;
-      dom_idx[i] = dom;
-      sdom_marked[i] = false;
+
+	   ifstream npart_in(f_iparts.c_str());
+	   if(!npart_in.is_open())
+	   {
+	      cerr<<("Error: cannot open .npart file . It may not exist !");
+	      exit(1);
+	   }
+
+	   // Re-ordered nodes of the whole mesh for ouput
+	   for(i=0; i<NodesNumber_Linear; i++)
+	   {
+	      npart_in>>dom>>ws;
+	      dom_idx[i] = dom;
+	      sdom_marked[i] = false;
+	   }
+	   npart_in.close();
+	   //remove(f_iparts.c_str());
+   } else {
+	   for(i=0; i<NodesNumber_Linear; i++)
+	   {
+	      dom_idx[i] = 0;
+	      sdom_marked[i] = false;
+	   }
    }
-   npart_in.close();
-   //remove(f_iparts.c_str());
+
 
    //--------------------------------------------------------------------------
    // Output a partitioned mesh
