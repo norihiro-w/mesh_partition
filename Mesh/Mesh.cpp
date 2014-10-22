@@ -829,6 +829,355 @@ void Mesh::ConstructSubDomain_by_Elements(const string fname, const int num_part
 	//delete nod_dom;
 }
 
+void Mesh::getInternalNodes(const vector<long> &node_dom_idx, const int idom, vector<bool> &sdom_marked, vector<Node*> &internal_quad_nodes, vector<Node*> &internal_nodes)
+{
+	for (size_t j = 0; j < node_dom_idx.size(); j++)
+	{
+		if (node_dom_idx[j] == idom && !sdom_marked[j])
+		{
+			if (j >= (size_t)NodesNumber_Linear)
+			{
+				internal_quad_nodes.push_back(node_vector[j]);
+			}
+			internal_nodes.push_back(node_vector[j]);
+			sdom_marked[j] = true; // avoid other subdomain use this node
+		}
+	}
+}
+
+int Mesh::readMaterialDataFile(const std::string &fpath, const std::string &mat_fname, vector<string> &m_datanames, int num_data, vector<string> &m_headers, std::vector<size_t> &m_header_marker_per_data, std::vector<double> &m_ele_val)
+{
+	string line_buffer;
+	string mat_fname_abs = fpath + mat_fname;
+	ifstream is_mat(mat_fname_abs.c_str());
+	if (!is_mat.good())
+	{
+		cout << "Material data file " << mat_fname_abs << " does not exist" << endl;
+		exit(1);
+	}
+	is_mat >> num_data;
+	m_datanames.resize(num_data);
+	m_header_marker_per_data.resize(num_data + 1);
+	m_header_marker_per_data[0] = 0;
+	for (int k = 0; k < num_data; k++)
+	{
+		string data_name;
+		is_mat >> m_datanames[k];
+		m_datanames[k] = fpath + m_datanames[k];
+	}
+	is_mat.close();
+	// Read each data file
+	for (int k = 0; k < num_data; k++)
+	{
+		is_mat.open(m_datanames[k].c_str());
+		if (!is_mat.good())
+		{
+			cout << "Material data file " << m_datanames[k] << " does not exist" << endl;
+			exit(1);
+		}
+		while (!is_mat.eof())
+		{
+			getline(is_mat, line_buffer);
+			if (line_buffer.find("$DATA") != string::npos)
+			{
+				m_headers.push_back(line_buffer);
+				const size_t ne = elem_vector.size();
+				for (size_t ie = 0; ie < ne; ie++)
+				{
+					long index;
+					double m_val;
+					is_mat >> index >> m_val;
+					//m_ele_idx.push_back(index);
+					m_ele_val.push_back(m_val);
+				}
+			}
+			else if (line_buffer.find("#STOP") != string::npos)
+			{
+				break;
+			}
+			else if (line_buffer.size() > 0)
+			{
+				m_headers.push_back(line_buffer);
+			}
+		}
+		m_header_marker_per_data[k + 1] = m_headers.size();
+		is_mat.clear();
+		is_mat.close();
+	}
+	return num_data;
+}
+
+template<typename T> std::string number2str(T d)
+{
+	std::stringstream out;
+	out << d;
+	return out.str();
+}
+
+void read_npart_file(const int num_parts, const string fname, vector<long> &vec_node_dom_idx, vector<bool> &vec_node_dom_marked)
+{
+	const string s_nparts(number2str(num_parts));
+	const string f_iparts = fname + ".mesh.npart." + s_nparts;
+	ifstream npart_in(f_iparts.c_str());
+	if (!npart_in.is_open())
+	{
+		cerr << ("Error: cannot open .npart file . It may not exist !");
+		exit(1);
+	}
+	for (long i = 0; i < static_cast<long>(vec_node_dom_idx.size()); i++)
+	{
+		int dom;
+		npart_in >> dom >> ws;
+		vec_node_dom_idx[i] = dom;
+		vec_node_dom_marked[i] = false;
+	}
+	npart_in.close();
+}
+
+void Mesh::outputRenumedVTK(const std::string fname, const std::string s_nparts, const int num_parts, std::vector<long> &nnodes_sdom_start, long end, std::vector<Node*> &sbd_nodes, const bool is_quad, const bool osdom)
+{
+	std::string f_iparts = fname + "_renum_" + s_nparts + ".msh";
+	ofstream os(f_iparts.c_str(), ios::out | ios::trunc);
+	// Output renumbered mesh
+	os << "#FEM_MSH\n   $PCS_TYPE\n    NULL" << endl;
+	os << " $NODES\n" << NodesNumber_Quadratic << endl;
+	std::vector<Node*> vec_sorted_nodes(NodesNumber_Quadratic);
+	for (int idom = 0; idom < num_parts; idom++)
+	{
+		const long start = nnodes_sdom_start[idom];
+		//      const long end = nnodes_sdom_linear_elements[idom];
+		if (idom < num_parts - 1)
+			end = nnodes_sdom_start[idom + 1];
+		else
+			end = static_cast<long>(sbd_nodes.size());
+
+		for (long i = start; i < end; i++)
+		{
+			Node* a_node = sbd_nodes[i];
+			a_node->index = a_node->local_index;
+			vec_sorted_nodes[a_node->index] = a_node;
+			//a_node->Write(os);
+		}
+	}
+	for (size_t i = 0; i < vec_sorted_nodes.size(); i++)
+		vec_sorted_nodes[i]->Write(os);
+	sbd_nodes.clear();
+	os << " $ELEMENTS\n" << elem_vector.size() << endl;
+	for (size_t e = 0; e < elem_vector.size(); e++)
+	{
+		elem_vector[e]->WriteGSmsh(os, is_quad);
+	}
+	os << "#STOP" << endl;
+	os.close();
+	if (osdom)
+	{
+		//-----------------------------------------------------------
+		/// VTK output
+		// Elements in this subdomain
+		f_iparts = fname + "_renum_" + s_nparts + ".vtk";
+		//f_iparts = fname+"_"+str_buf+".vtk";
+		ofstream os(f_iparts.c_str(), ios::out | ios::trunc);
+		WriteVTK_Nodes(os, vec_sorted_nodes, 0);
+		WriteVTK_Elements_of_Subdomain(os, elem_vector, 0, 0);
+		//-----------------------------------------------------------
+	}
+}
+
+void Mesh::findElementsInSubDomain(const vector<Node*>& internal_nodes, vector<Elem*>& subdom_internal_elements, vector<Elem*>& subdom_ghost_elements)
+{
+	for (size_t j = 0; j < internal_nodes.size(); j++)
+	{
+		Node* a_node = internal_nodes[j];
+		// Search the elements connected to this nodes
+		const size_t ne_rel = a_node->ElementsRelated.size();
+		for (size_t k = 0; k < ne_rel; k++)
+		{
+			Elem* a_elem = elem_vector[a_node->ElementsRelated[k]];
+			if (a_elem->getStatus())
+				continue;
+
+			a_elem->Marking(true);
+			vector<int> ng_nodes; // non ghost nodes in ghost elements
+			vector<int> g_nodes; // ghost nodes in ghost elements
+			for (int kk = 0; kk < a_elem->getNodesNumber(useQuadratic); kk++)
+			{
+				if (a_elem->getNode(kk)->getStatus())
+					ng_nodes.push_back(kk);
+				else
+					g_nodes.push_back(kk);
+			}
+			// All nodes of this element are inside this subdomain
+			if (g_nodes.empty())
+			{
+				subdom_internal_elements.push_back(a_elem);
+			}
+			else if (g_nodes.size() != static_cast<size_t>(a_elem->getNodesNumber(useQuadratic)))
+			{
+				subdom_ghost_elements.push_back(a_elem);
+				// set ghost nodes
+				const int nn_gl = static_cast<int>(ng_nodes.size());
+				a_elem->nnodes_gl = nn_gl;
+				a_elem->ghost_nodes.resize(nn_gl);
+				for (int kk = 0; kk < nn_gl; kk++)
+					a_elem->ghost_nodes[kk] = ng_nodes[kk];
+			}
+		}
+	}
+}
+
+void Mesh::findGhostNodesInSubDomain(const vector<Elem*>& subdom_ghost_elements, const bool is_quad, vector<Node*>& dom_ghost_linear_nodes, vector<Node*>& dom_ghost_quad_nodes)
+{
+	for (size_t j = 0; j < subdom_ghost_elements.size(); j++)
+	{
+		Elem* a_elem = subdom_ghost_elements[j];
+		for (int k = 0; k < a_elem->getNodesNumber(is_quad); k++)
+			a_elem->nodes[k]->Marking(false);
+		// mark ghost nodes
+		for (size_t k = 0; k < a_elem->ghost_nodes.size(); k++)
+			a_elem->nodes[a_elem->ghost_nodes[k]]->Marking(true); //ghost_nodes actually hold internal nodes
+	}
+	//
+	for (size_t j = 0; j < subdom_ghost_elements.size(); j++)
+	{
+		Elem* a_elem = subdom_ghost_elements[j];
+		for (int k = 0; k < a_elem->getNodesNumber(is_quad); k++)
+		{
+			Node* a_node = a_elem->nodes[k];
+			if (a_node->getStatus())
+				// ghost nodes are unmarked
+				continue;
+
+			a_node->Marking(true);
+			if (k < a_elem->getNodesNumber(false))
+				dom_ghost_linear_nodes.push_back(a_node);
+			else
+				dom_ghost_quad_nodes.push_back(a_node);
+		}
+	}
+}
+
+long Mesh::makeSubDomainNodeList(long node_id_shift, const vector<Node*>& internal_nodes, const vector<Node*>& internal_quad_nodes, const vector<Node*>& dom_ghost_linear_nodes, const vector<Node*>& dom_ghost_quad_nodes, vector<Node*>& sbd_nodes)
+{
+	// make a list of domain nodes
+	long new_node_idx = node_id_shift;
+	// add internal linear
+	for (size_t j = 0; j < internal_nodes.size() - internal_quad_nodes.size(); j++)
+	{
+		Node* a_node = internal_nodes[j];
+		a_node->index = new_node_idx++; //local node id
+		sbd_nodes.push_back(a_node);
+	}
+	// add ghost linear
+	for (size_t j = 0; j < dom_ghost_linear_nodes.size(); j++)
+	{
+		Node* a_node = dom_ghost_linear_nodes[j];
+		a_node->index = new_node_idx++;
+		sbd_nodes.push_back(a_node);
+	}
+	// add internal quad
+	for (size_t j = 0; j < internal_quad_nodes.size(); j++)
+	{
+		Node* a_node = internal_quad_nodes[j];
+		a_node->index = new_node_idx++;
+		sbd_nodes.push_back(a_node);
+	}
+	// add ghost quad
+	for (size_t j = 0; j < dom_ghost_quad_nodes.size(); j++)
+	{
+		Node* a_node = dom_ghost_quad_nodes[j];
+		a_node->index = new_node_idx++;
+		sbd_nodes.push_back(a_node);
+	}
+	return new_node_idx;
+}
+
+void Mesh::writeMatData(int num_data, const vector<string>& m_datanames, const string& dom_str, const vector<size_t>& m_header_marker_per_data, const vector<string>& m_headers, const long n_all_elements, const long nei_size, const vector<Elem*>& subdom_internal_elements, const std::string& deli, const vector<double>& m_ele_val, const vector<Elem*>& subdom_ghost_elements)
+{
+	ofstream os_mat;
+	for (int mm = 0; mm < num_data; mm++)
+	{
+		string mat_ofile_name = m_datanames[mm] + dom_str;
+		os_mat.open(mat_ofile_name.c_str(), ios::trunc);
+		for (size_t mh = m_header_marker_per_data[mm]; mh < m_header_marker_per_data[mm + 1]; mh++)
+		{
+			os_mat << m_headers[mh] << endl;
+		}
+		const long e_shift = n_all_elements * mm;
+		for (long j = 0; j < nei_size; j++)
+		{
+			const long entry_index = subdom_internal_elements[j]->getIndex() + e_shift;
+			os_mat << j << deli << m_ele_val[entry_index] << endl;
+		}
+		for (size_t j = 0; j < subdom_ghost_elements.size(); j++)
+		{
+			const long entry_index = subdom_ghost_elements[j]->getIndex() + e_shift;
+			os_mat << j + nei_size << deli << m_ele_val[entry_index] << endl;
+		}
+		os_mat << "#STOP" << endl;
+		os_mat.clear();
+		os_mat.close();
+	}
+}
+
+void Mesh::outputSubDomainVTK(int idom, const std::string &fname, const std::string &dom_str, const std::string &s_nparts,
+		std::vector<Node*> &sbd_nodes, std::vector<Elem*> &subdom_internal_elements, std::vector<Elem*> &subdom_ghost_elements,
+		long nnodes_previous_sdom, long node_id_shift,int num_data,
+		std::vector<std::string> &m_headers, std::vector<size_t> &m_header_marker_per_data,
+		long n_all_elements, long nei_size, std::vector<double> &m_ele_val)
+{
+	//-----------------------------------------------------------
+	// VTK output
+	// Elements in this subdomain
+	std::string f_iparts = fname + "_" + dom_str + "_of_" + s_nparts + "_subdomains.vtk";
+	//f_iparts = fname+"_"+str_buf+".vtk";
+	ofstream os(f_iparts.c_str(), ios::out | ios::trunc);
+
+	WriteVTK_Nodes(os, sbd_nodes, nnodes_previous_sdom);
+	WriteVTK_Elements_of_Subdomain(os, subdom_internal_elements, idom + 1, node_id_shift);
+
+	/// Material data partitioning
+	if (num_data > 0)
+	{
+		for (int mm = 0; mm < num_data; mm++)
+		{
+			// Partition
+			os << "SCALARS " << m_headers[m_header_marker_per_data[mm] + 4] << " double 1\nLOOKUP_TABLE default" << endl;
+			const long e_shift = n_all_elements * mm;
+			for (long i = 0; i < nei_size; i++)
+			{
+				const long entry_index = subdom_internal_elements[i]->getIndex() + e_shift;
+				os << m_ele_val[entry_index] << endl;
+			}
+		}
+	}
+	os.clear();
+	os.close();
+
+	//// Ghost elements in this subdomain
+	f_iparts = fname + "_" + dom_str + "_ghost_of_" + s_nparts + "_subdomains.vtk";
+	////f_iparts = fname+"_"+str_buf+"ghost.vtk";
+	os.open(f_iparts.c_str(), ios::out | ios::trunc);
+	WriteVTK_Nodes(os, sbd_nodes, nnodes_previous_sdom);
+	WriteVTK_Elements_of_Subdomain(os, subdom_ghost_elements, 0, node_id_shift);
+	if (num_data > 0)
+	{
+		for (int mm = 0; mm < num_data; mm++)
+		{
+			// Partition
+			os << "SCALARS " << m_headers[m_header_marker_per_data[mm] + 4] << " double 1\nLOOKUP_TABLE default" << endl;
+			const long e_shift = n_all_elements * mm;
+			for (size_t i = 0; i < subdom_ghost_elements.size(); i++)
+			{
+				const long entry_index = subdom_ghost_elements[i]->getIndex() + e_shift;
+				os << m_ele_val[entry_index] << endl;
+			}
+		}
+	}
+	os.clear();
+	os.close();
+	//-----------------------------------------------------------
+}
+
 /*!
  \brief void Mesh::ConstructSubDomain_by_Nodes
 
@@ -837,134 +1186,37 @@ void Mesh::ConstructSubDomain_by_Elements(const string fname, const int num_part
  02.2012 WW
  */
 
-void Mesh::ConstructSubDomain_by_Nodes(const string fname, const string fpath, const std::string mat_fname, const int num_parts, const bool is_quad, const bool osdom)
+void Mesh::ConstructSubDomain_by_Nodes(const string fname, const string fpath, const std::string mat_fname, const int num_parts, const bool is_quad, const bool outut_subdomains)
 {
-
-	string f_iparts;
-	string o_part_msh;
-	long dom;
-	int k, kk;
-	long i, j;
-
-	// Number of integer variables of subdomain elements
-	long nmb_element_idxs;
-	long nmb_element_idxs_g;
-
-	string deli = " ";
-
-	Node *a_node = NULL;
-	Elem *a_elem = NULL;
-	//
-
-	// Material data partitioning
-	int num_data = 0;
-	vector < string > m_headers;
-	vector<size_t> m_header_marker_per_data;
-	vector < string > m_datanames;
-	//vector<long> m_ele_idx;
-	vector<double> m_ele_val;
-
-	if (mat_fname.size() != 0)
-	{
-		string line_buffer;
-		string mat_fname_abs = fpath + mat_fname;
-
-		ifstream is_mat(mat_fname_abs.c_str());
-		if (!is_mat.good())
-		{
-			cout << "Material data file " << mat_fname_abs << " does not exist" << endl;
-			exit(1);
-		}
-		is_mat >> num_data;
-		m_datanames.resize(num_data);
-		m_header_marker_per_data.resize(num_data + 1);
-		m_header_marker_per_data[0] = 0;
-		for (k = 0; k < num_data; k++)
-		{
-			string data_name;
-			is_mat >> m_datanames[k];
-			m_datanames[k] = fpath + m_datanames[k];
-		}
-		is_mat.close();
-
-		// Read each data file
-		for (k = 0; k < num_data; k++)
-		{
-			is_mat.open(m_datanames[k].c_str());
-			if (!is_mat.good())
-			{
-				cout << "Material data file " << m_datanames[k] << " does not exist" << endl;
-				exit(1);
-			}
-			while (!is_mat.eof())
-			{
-				getline(is_mat, line_buffer);
-				if (line_buffer.find("$DATA") != string::npos)
-				{
-					m_headers.push_back(line_buffer);
-					const size_t ne = elem_vector.size();
-					for (size_t ie = 0; ie < ne; ie++)
-					{
-						long index;
-						double m_val;
-						is_mat >> index >> m_val;
-						//m_ele_idx.push_back(index);
-						m_ele_val.push_back(m_val);
-					}
-				}
-				else if (line_buffer.find("#STOP") != string::npos)
-				{
-					break;
-				}
-				else if (line_buffer.size() > 0)
-				{
-					m_headers.push_back(line_buffer);
-				}
-			}
-			m_header_marker_per_data[k + 1] = m_headers.size();
-			is_mat.clear();
-			is_mat.close();
-		}
-	}
-
-	// Convert int to string
-	string s_nparts;
-	stringstream ss;
-	ss << num_parts;
-	ss >> s_nparts;
-	ss.clear();
-
-	f_iparts = fname + ".mesh.npart." + s_nparts;
-	//o_part_msh = fname + "." + s_nparts +"mesh";
-
-	ifstream npart_in(f_iparts.c_str());
-	if (!npart_in.is_open())
-	{
-		cerr << ("Error: cannot open .npart file . It may not exist !");
-		exit(1);
-	}
-
-	const long nn = static_cast<long>(node_vector.size());
+	const long n_all_nodes = static_cast<long>(node_vector.size());
 	const long nnodes_in_usage = useQuadratic ? NodesNumber_Quadratic : NodesNumber_Linear;
 
-	vector<bool> sdom_marked(nn);
-	vector<long> dom_idx(nnodes_in_usage);
+	// -------------------------------------------------------------------------
+	// Read material data
+	// -------------------------------------------------------------------------
+	int num_data = 0;
+	vector<string> m_headers;
+	vector<size_t> m_header_marker_per_data;
+	vector<string> m_datanames;
+	vector<double> m_ele_val;
+	if (mat_fname.size() != 0)
+		num_data = readMaterialDataFile(fpath, mat_fname, m_datanames, num_data, m_headers, m_header_marker_per_data, m_ele_val);
 
-	// Re-ordered nodes of the whole mesh for ouput
-	for (i = 0; i < static_cast<long>(dom_idx.size()); i++)
-	{
-		npart_in >> dom >> ws;
-		dom_idx[i] = dom;
-		sdom_marked[i] = false;
-	}
-	npart_in.close();
-	//remove(f_iparts.c_str());
 
-#define OUTPUT_TO_SINGLE_FILE
-#ifdef OUTPUT_TO_SINGLE_FILE
-	string name_f = fname + "_partitioned_" + s_nparts + ".msh";
+	// -------------------------------------------------------------------------
+	// Read .npart file
+	// -------------------------------------------------------------------------
+	vector<bool> vec_node_dom_marked(n_all_nodes);
+	vector<long> vec_node_dom_idx(nnodes_in_usage);
+	read_npart_file(num_parts, fname, vec_node_dom_idx, vec_node_dom_marked);
+
+	// -------------------------------------------------------------------------
+	// open partitioned file and write header
+	// -------------------------------------------------------------------------
+	const string s_nparts(number2str(num_parts));
+	const string name_f = fname + "_partitioned_" + s_nparts + ".msh";
 	fstream os_subd(name_f.c_str(), ios::out | ios::trunc);
-	name_f = "Subdomain mesh "
+	const std::string str_header = "Subdomain mesh "
 			"(Domain nodes(quad); Domain nodes(linear); Inner elements; Ghost elements; Internal nodes(linear); Internal nodes(quad)) "
 			"Global nodes(linear); Global nodes(quad); "
 			"Total integer variables of elements;Total integer variables of ghost elements  ";
@@ -972,250 +1224,98 @@ void Mesh::ConstructSubDomain_by_Nodes(const string fname, const string fpath, c
 //           "(Nodes;  Nodes_linear; Elements; Ghost elements; Nodes of Linear elements; Nodes of quadratic elements) "
 //            "Nodes of Linear whole elements; Nodes of whole quadratic elements; "
 //       "Total integer variables of elements;Total integer variables of ghost elements  ";
-	os_subd << name_f << endl;
+	os_subd << str_header << endl;
 	os_subd << num_parts << endl;
 	setw(14);
 	os_subd.precision(14);
 	//os_subd.setf(ios::fixed, ios::scientific);
 	os_subd.setf(ios::scientific);
-#endif
 
-	long node_id_shift = 0;
-	long nnodes_previous_sdom = 0;
+	// -------------------------------------------------------------------------
+	// collect sub-domain nodes
+	// -------------------------------------------------------------------------
 	vector<long> nnodes_sdom_start(num_parts);
 	vector<long> nnodes_sdom_linear_elements(num_parts);
 	vector<long> nnodes_sdom_quadratic_elements(num_parts);
 	vector<size_t> position_node_file(num_parts);
-
-	const long ne_total = static_cast<long>(elem_vector.size());
-
+	const long n_all_elements = static_cast<long>(elem_vector.size());
 	vector<Node*> sbd_nodes;
+
+	long node_id_shift = 0;
+	long nnodes_previous_sdom = 0;
 	for (int idom = 0; idom < num_parts; idom++)
 	{
-
 		cout << "Process partition: " << idom << endl;
-
-		nmb_element_idxs = 0;
-		nmb_element_idxs_g = 0;
-
 		nnodes_sdom_start[idom] = nnodes_previous_sdom;
 
+		// Un-making all nodes and elements of the whole mesh
+		for (long j = 0; j < n_all_nodes; j++)
+			node_vector[j]->Marking(false);
+		for (long j = 0; j < n_all_elements; j++)
+			elem_vector[j]->Marking(false);
+
+		// Find and mark internal nodes
 		vector<Node*> internal_nodes; // both linear and quad
 		vector<Node*> internal_quad_nodes; // only quad
-		for (j = 0; j < static_cast<long>(dom_idx.size()); j++)
-		{
-			if (dom_idx[j] == idom && (!sdom_marked[j]))
-			{
-				if (j >= NodesNumber_Linear)
-				{
-					internal_quad_nodes.push_back(node_vector[j]);
-				}
-				internal_nodes.push_back(node_vector[j]);
-				sdom_marked[j] = true;  // avoid other subdomain use this node
-			}
-		}
-
+		getInternalNodes(vec_node_dom_idx, idom, vec_node_dom_marked, internal_quad_nodes, internal_nodes);
 		nnodes_sdom_linear_elements[idom] = static_cast<long>(internal_nodes.size() - internal_quad_nodes.size());
 		nnodes_sdom_quadratic_elements[idom] = static_cast<long>(internal_nodes.size());
-
 		const long size_sbd_nodes0 = static_cast<long>(internal_nodes.size()); // Nodes in this domain
-
-		vector<Elem*> in_subdom_elements;
-		vector<Elem*> ghost_subdom_elements;
-
-		// Un-making all nodes and elements of the whole mesh
-		for (j = 0; j < nn; j++)
-			node_vector[j]->Marking(false);
-		for (j = 0; j < ne_total; j++)
-			elem_vector[j]->Marking(false);
-		// Only select nodes in this subdomain
-		for (j = 0; j < static_cast<long>(internal_nodes.size()); j++)
+		for (size_t j = 0; j < internal_nodes.size(); j++)
 		{
-			a_node = internal_nodes[j];
+			Node* a_node = internal_nodes[j];
 			a_node->Marking(true);
 			a_node->local_index = j + node_id_shift; //internal node id should be continuous
 		}
 
-		/// Find the elements in this subdomain.
-		for (j = 0; j < static_cast<long>(internal_nodes.size()); j++)
-		{
-			a_node = internal_nodes[j];
+		// Find elements in this domain
+		vector<Elem*> subdom_internal_elements;
+		vector<Elem*> subdom_ghost_elements;
+		findElementsInSubDomain(internal_nodes, subdom_internal_elements, subdom_ghost_elements);
 
-			// Search the elements connected to this nodes
-			const long ne_rel = static_cast<long>(a_node->ElementsRelated.size());
-			for (k = 0; k < ne_rel; k++)
-			{
-				a_elem = elem_vector[a_node->ElementsRelated[k]];
-
-				// If checked
-				if (a_elem->getStatus())
-					continue;
-
-				vector<int> ng_nodes; // non ghost nodes in ghost elements
-				vector<int> g_nodes; // ghost nodes in ghost elements
-				for (kk = 0; kk < a_elem->getNodesNumber(useQuadratic); kk++)
-				{
-					if (a_elem->getNode(kk)->getStatus())
-					{
-						ng_nodes.push_back(kk);
-					}
-					else
-						g_nodes.push_back(kk);
-				}
-
-				// All nodes of this element are inside this subdomain
-				if (g_nodes.size() == 0)
-				{
-					in_subdom_elements.push_back(a_elem);
-				}
-				else if (g_nodes.size() != static_cast<size_t>(a_elem->getNodesNumber(useQuadratic)))
-				{
-					ghost_subdom_elements.push_back(a_elem);
-
-					const int nn_gl = static_cast<int>(ng_nodes.size());
-					a_elem->nnodes_gl = nn_gl;
-					a_elem->ghost_nodes.resize(nn_gl);
-					for (kk = 0; kk < nn_gl; kk++)
-						a_elem->ghost_nodes[kk] = ng_nodes[kk];
-
-				}
-				a_elem->Marking(true);
-
-				ng_nodes.clear();
-				g_nodes.clear();
-
-			}
-		}
-
-		/// Number of subdomain nodes for linear element
-		//-----------------------------------------------
-		// Add nodes in ghost elements
-		const long ne_g = static_cast<long>(ghost_subdom_elements.size());
-		for (j = 0; j < ne_g; j++)
-		{
-			a_elem = ghost_subdom_elements[j];
-			for (k = 0; k < a_elem->getNodesNumber(is_quad); k++)
-				a_elem->nodes[k]->Marking(false);
-
-			// mark internal nodes
-			const int ngh_nodes = static_cast<int>(a_elem->ghost_nodes.size());
-			for (k = 0; k < ngh_nodes; k++)
-				a_elem->nodes[a_elem->ghost_nodes[k]]->Marking(true); //ghost_nodes actually hold internal nodes
-		}
-		//
+		// Find ghost nodes
 		vector<Node*> dom_ghost_linear_nodes, dom_ghost_quad_nodes;
-		for (j = 0; j < ne_g; j++)
-		{
-			a_elem = ghost_subdom_elements[j];
-			for (k = 0; k < a_elem->getNodesNumber(is_quad); k++)
-			{
-				a_node = a_elem->nodes[k];
-				if (a_node->getStatus()) // ghost nodes are unmarked
-					continue;
-				a_node->Marking(true);
-				if (k < a_elem->getNodesNumber(false))
-				{
-					dom_ghost_linear_nodes.push_back(a_node);
-				}
-				else
-				{
-					dom_ghost_quad_nodes.push_back(a_node);
-				}
-			}
-
-		}
+		findGhostNodesInSubDomain(subdom_ghost_elements, is_quad, dom_ghost_linear_nodes, dom_ghost_quad_nodes);
 
 		// make a list of domain nodes
-		long new_node_idx = node_id_shift;
-		// add internal linear
-		for (j = 0; j < static_cast<long>(internal_nodes.size() - internal_quad_nodes.size()); j++)
-		{
-			a_node = internal_nodes[j];
-			a_node->index = new_node_idx++; //local node id
-			sbd_nodes.push_back(a_node);
-		}
-		// add ghost linear
-		for (j = 0; j < static_cast<long>(dom_ghost_linear_nodes.size()); j++)
-		{
-			a_node = dom_ghost_linear_nodes[j];
-			a_node->index = new_node_idx++;
-			sbd_nodes.push_back(a_node);
-		}
-		// add internal quad
-		for (j = 0; j < static_cast<long>(internal_quad_nodes.size()); j++)
-		{
-			a_node = internal_quad_nodes[j];
-			a_node->index = new_node_idx++;
-			sbd_nodes.push_back(a_node);
-		}
-		// add ghost quad
-		for (j = 0; j < static_cast<long>(dom_ghost_quad_nodes.size()); j++)
-		{
-			a_node = dom_ghost_quad_nodes[j];
-			a_node->index = new_node_idx++;
-			sbd_nodes.push_back(a_node);
-		}
+		makeSubDomainNodeList(node_id_shift, internal_nodes, internal_quad_nodes, dom_ghost_linear_nodes, dom_ghost_quad_nodes, sbd_nodes);
 		const long size_sbd_nodes = static_cast<long>(sbd_nodes.size()) - nnodes_previous_sdom;
 
 		// Count the total integer variables of this subdomain
-		const long nei = static_cast<long>(in_subdom_elements.size());
-		nmb_element_idxs = 3 * nei;
-		for (j = 0; j < nei; j++)
-		{
-			nmb_element_idxs += in_subdom_elements[j]->getNodesNumber(is_quad);
-		}
-		const long neg = static_cast<long>(ghost_subdom_elements.size());
+		long nmb_element_idxs = 3 * subdom_internal_elements.size();
+		for (size_t j = 0; j < subdom_internal_elements.size(); j++)
+			nmb_element_idxs += subdom_internal_elements[j]->getNodesNumber(is_quad);
 		//  mat index, element type, number of element, number of ghost nodes, number of ghost nodes of high order elements
-		nmb_element_idxs_g = 5 * neg;
-		for (j = 0; j < neg; j++)
+		long nmb_element_idxs_g = 5 * subdom_ghost_elements.size();
+		for (size_t j = 0; j < subdom_ghost_elements.size(); j++)
 		{
-			nmb_element_idxs_g += ghost_subdom_elements[j]->getNodesNumber(is_quad);
-			nmb_element_idxs_g += static_cast<long>(ghost_subdom_elements[j]->ghost_nodes.size());
+			nmb_element_idxs_g += subdom_ghost_elements[j]->getNodesNumber(is_quad);
+			nmb_element_idxs_g += static_cast<long>(subdom_ghost_elements[j]->ghost_nodes.size());
 		}
 
-		string dom_str;
-		ss << idom;
-		ss >> dom_str;
-		ss.clear();
-#ifdef OUTPUT_TO_DIFF_FILES
-		// Make output of this subdomain for simulation
-		//string name_f = fname+"_"+dom_str+"_of_"+s_nparts+"_subdomains.msh";
-		string name_f = fname+"_"+dom_str+".msh";
-		fstream os_subd(name_f.c_str(), ios::out|ios::trunc );
-		//os_subd<<"#FEM_MSH\n   $PCS_TYPE\n    NULL"<<endl;
-		//os_subd<<" $NODES\n"<<size_sbd_nodes<<endl;
-
-		name_f = "Subdomain mesh "
-		"(Domain nodes(quad); Domain nodes(linear); Inner elements; Ghost elements; Internal nodes(linear); Internal nodes(quad)) "
-		"Global nodes(linear); Global nodes(quad); "
-		"Total integer variables of elements;Total integer variables of ghost elements  ";
-//	  name_f = "Subdomain mesh "
-//           "(Nodes;  Nodes_linear; Elements; Ghost elements; Nodes of Linear elements; Nodes of quadratic elements) "
-//            "Nodes of Linear whole elements; Nodes of whole quadratic elements; "
-//       "Total integer variables of elements;Total integer variables of ghost elements  ";
-		os_subd<<name_f<<endl;
-#endif
-		os_subd << size_sbd_nodes << deli << size_sbd_nodes - internal_quad_nodes.size() - dom_ghost_quad_nodes.size() << deli << in_subdom_elements.size() << deli << ne_g << deli << internal_nodes.size() - internal_quad_nodes.size() << deli << internal_nodes.size() << deli << NodesNumber_Linear << deli << NodesNumber_Quadratic << deli << nmb_element_idxs << deli << nmb_element_idxs_g << endl;
+		string dom_str(number2str(idom));
+		const std::string deli(" ");
+		os_subd << size_sbd_nodes << deli << size_sbd_nodes - internal_quad_nodes.size() - dom_ghost_quad_nodes.size() << deli << subdom_internal_elements.size() << deli << subdom_ghost_elements.size() << deli << internal_nodes.size() - internal_quad_nodes.size() << deli << internal_nodes.size() << deli << NodesNumber_Linear << deli << NodesNumber_Quadratic << deli << nmb_element_idxs << deli << nmb_element_idxs_g << endl;
 
 		position_node_file[idom] = os_subd.tellp();
 		//os_subd<<"Nodes"<<endl;
-		for (j = 0; j < size_sbd_nodes; j++)
+		for (long j = 0; j < size_sbd_nodes; j++)
 			sbd_nodes[j + nnodes_previous_sdom]->Write(os_subd);
 
 		//os_subd<<"Elements"<<endl;
-		const long nei_size = static_cast<long>(in_subdom_elements.size());
-		for (j = 0; j < nei_size; j++)
-			in_subdom_elements[j]->WriteSubDOM(os_subd, node_id_shift, is_quad);
+		const long nei_size = static_cast<long>(subdom_internal_elements.size());
+		for (long j = 0; j < nei_size; j++)
+			subdom_internal_elements[j]->WriteSubDOM(os_subd, node_id_shift, is_quad);
 
 		//os_subd<<"Ghost elements"<<endl;
-		for (j = 0; j < ne_g; j++)
+		for (size_t j = 0; j < subdom_ghost_elements.size(); j++)
 		{
-			a_elem = ghost_subdom_elements[j];
+			Elem* a_elem = subdom_ghost_elements[j];
 			a_elem->WriteSubDOM(os_subd, node_id_shift, is_quad);
 			const int ngh_nodes = static_cast<int>(a_elem->ghost_nodes.size());
 
 			os_subd << a_elem->nnodes_gl << deli << ngh_nodes << deli;
-			for (kk = 0; kk < ngh_nodes; kk++)
+			for (int kk = 0; kk < ngh_nodes; kk++)
 			{
 				os_subd << a_elem->ghost_nodes[kk] << deli;
 			}
@@ -1223,107 +1323,19 @@ void Mesh::ConstructSubDomain_by_Nodes(const string fname, const string fpath, c
 		}
 
 		//----------------------------------------------------------------------------------
-		/// Material data partitioning
+		// Material data partitioning
 		if (num_data > 0)
-		{
-			ofstream os_mat;
-			for (int mm = 0; mm < num_data; mm++)
-			{
-				string mat_ofile_name = m_datanames[mm] + dom_str;
-				os_mat.open(mat_ofile_name.c_str(), ios::trunc);
-				for (size_t mh = m_header_marker_per_data[mm]; mh < m_header_marker_per_data[mm + 1]; mh++)
-				{
-					os_mat << m_headers[mh] << endl;
-				}
-
-				const long e_shift = ne_total * mm;
-				for (j = 0; j < nei_size; j++)
-				{
-					const long entry_index = in_subdom_elements[j]->getIndex() + e_shift;
-					os_mat << j << deli << m_ele_val[entry_index] << endl;
-				}
-				for (j = 0; j < ne_g; j++)
-				{
-					const long entry_index = ghost_subdom_elements[j]->getIndex() + e_shift;
-					os_mat << j + nei_size << deli << m_ele_val[entry_index] << endl;
-				}
-				os_mat << "#STOP" << endl;
-				os_mat.clear();
-				os_mat.close();
-			}
-		}
+			writeMatData(num_data, m_datanames, dom_str, m_header_marker_per_data, m_headers, n_all_elements, nei_size, subdom_internal_elements, deli, m_ele_val, subdom_ghost_elements);
 		//----------------------------------------------------------------------------------
 
-#ifdef OUTPUT_TO_DIFF_FILES
-		os_subd.clear();
-		os_subd.close();
-#endif
-		if (osdom)
-		{
-			//-----------------------------------------------------------
-			/// VTK output
-			// Elements in this subdomain
-			f_iparts = fname + "_" + dom_str + "_of_" + s_nparts + "_subdomains.vtk";
-			//f_iparts = fname+"_"+str_buf+".vtk";
-			ofstream os(f_iparts.c_str(), ios::out | ios::trunc);
-
-			WriteVTK_Nodes(os, sbd_nodes, nnodes_previous_sdom);
-			WriteVTK_Elements_of_Subdomain(os, in_subdom_elements, idom + 1, node_id_shift);
-
-			/// Material data partitioning
-			if (num_data > 0)
-			{
-				for (int mm = 0; mm < num_data; mm++)
-				{
-					// Partition
-					os << "SCALARS " << m_headers[m_header_marker_per_data[mm] + 4] << " double 1\nLOOKUP_TABLE default" << endl;
-					const long e_shift = ne_total * mm;
-					for (i = 0; i < nei_size; i++)
-					{
-						const long entry_index = in_subdom_elements[i]->getIndex() + e_shift;
-						os << m_ele_val[entry_index] << endl;
-					}
-				}
-			}
-			os.clear();
-			os.close();
-
-			//// Ghost elements in this subdomain
-			f_iparts = fname + "_" + dom_str + "_ghost_of_" + s_nparts + "_subdomains.vtk";
-			////f_iparts = fname+"_"+str_buf+"ghost.vtk";
-			os.open(f_iparts.c_str(), ios::out | ios::trunc);
-			WriteVTK_Nodes(os, sbd_nodes, nnodes_previous_sdom);
-			WriteVTK_Elements_of_Subdomain(os, ghost_subdom_elements, 0, node_id_shift);
-			if (num_data > 0)
-			{
-				for (int mm = 0; mm < num_data; mm++)
-				{
-					// Partition
-					os << "SCALARS " << m_headers[m_header_marker_per_data[mm] + 4] << " double 1\nLOOKUP_TABLE default" << endl;
-					const long e_shift = ne_total * mm;
-					for (i = 0; i < ne_g; i++)
-					{
-						const long entry_index = ghost_subdom_elements[i]->getIndex() + e_shift;
-						os << m_ele_val[entry_index] << endl;
-					}
-				}
-			}
-			os.clear();
-			os.close();
-			//-----------------------------------------------------------
-
-		}
+		if (outut_subdomains)
+			outputSubDomainVTK(idom, fname, dom_str, s_nparts, sbd_nodes, subdom_internal_elements, subdom_ghost_elements, nnodes_previous_sdom, node_id_shift, num_data, m_headers, m_header_marker_per_data, n_all_elements, nei_size, m_ele_val);
 
 		node_id_shift += size_sbd_nodes0;
 		nnodes_previous_sdom = static_cast<long>(sbd_nodes.size());
-		//sbd_nodes.clear();
-		in_subdom_elements.clear();
-		ghost_subdom_elements.clear();
 	}
 
-#ifdef OUTPUT_TO_SINGLE_FILE
-	// Rewrite nodes wwith new node index
-
+	// Rewrite nodes with new node index
 	long end = 0;
 	for (int idom = 0; idom < num_parts; idom++)
 	{
@@ -1334,9 +1346,9 @@ void Mesh::ConstructSubDomain_by_Nodes(const string fname, const string fpath, c
 			end = static_cast<long>(sbd_nodes.size());
 
 		os_subd.seekp(position_node_file[idom]);
-		for (i = start; i < end; i++)
+		for (long i = start; i < end; i++)
 		{
-			a_node = sbd_nodes[i];
+			Node* a_node = sbd_nodes[i];
 			a_node->index = a_node->local_index;
 			a_node->Write(os_subd);
 		}
@@ -1344,57 +1356,8 @@ void Mesh::ConstructSubDomain_by_Nodes(const string fname, const string fpath, c
 
 	os_subd.clear();
 	os_subd.close();
-#endif
 
-	f_iparts = fname + "_renum_" + s_nparts + ".msh";
-	ofstream os(f_iparts.c_str(), ios::out | ios::trunc);
-
-	// Output renumbered mesh
-	os << "#FEM_MSH\n   $PCS_TYPE\n    NULL" << endl;
-	os << " $NODES\n" << NodesNumber_Quadratic << endl;
-	std::vector<Node*> vec_sorted_nodes(NodesNumber_Quadratic);
-	for (int idom = 0; idom < num_parts; idom++)
-	{
-		const long start = nnodes_sdom_start[idom];
-//      const long end = nnodes_sdom_linear_elements[idom];
-		if (idom < num_parts - 1)
-			end = nnodes_sdom_start[idom + 1];
-		else
-			end = static_cast<long>(sbd_nodes.size());
-		for (i = start; i < end; i++)
-		{
-			a_node = sbd_nodes[i];
-			a_node->index = a_node->local_index;
-			vec_sorted_nodes[a_node->index] = a_node;
-			//a_node->Write(os);
-		}
-	}
-	for (size_t i = 0; i < vec_sorted_nodes.size(); i++)
-		vec_sorted_nodes[i]->Write(os);
-	sbd_nodes.clear();
-
-	os << " $ELEMENTS\n" << elem_vector.size() << endl;
-	for (size_t e = 0; e < elem_vector.size(); e++)
-	{
-		elem_vector[e]->WriteGSmsh(os, is_quad);
-	}
-	os << "#STOP" << endl;
-	os.close();
-
-	if (osdom)
-	{
-		//-----------------------------------------------------------
-		/// VTK output
-		// Elements in this subdomain
-		f_iparts = fname + "_renum_" + s_nparts + ".vtk";
-		//f_iparts = fname+"_"+str_buf+".vtk";
-		ofstream os(f_iparts.c_str(), ios::out | ios::trunc);
-
-		WriteVTK_Nodes(os, vec_sorted_nodes, 0);
-		WriteVTK_Elements_of_Subdomain(os, elem_vector, 0, 0);
-		//-----------------------------------------------------------
-
-	}
+	outputRenumedVTK(fname, s_nparts, num_parts, nnodes_sdom_start, end, sbd_nodes, is_quad, outut_subdomains);
 }
 
 // 02.2012. WW
