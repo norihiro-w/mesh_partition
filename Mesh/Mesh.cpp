@@ -1059,7 +1059,7 @@ void Mesh::findGhostNodesInSubDomain(const vector<Elem*>& subdom_ghost_elements,
 long Mesh::addSubDomainNodes(long node_id_shift, const vector<Node*>& internal_nodes, const vector<Node*>& internal_quad_nodes, const vector<Node*>& dom_ghost_linear_nodes, const vector<Node*>& dom_ghost_quad_nodes, vector<Node*>& sbd_nodes)
 {
 	// make a list of domain nodes
-	long new_node_idx = node_id_shift;
+	long new_node_idx = 0; //node_id_shift;
 	// add internal linear
 	for (size_t j = 0; j < internal_nodes.size() - internal_quad_nodes.size(); j++)
 	{
