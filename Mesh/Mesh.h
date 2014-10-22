@@ -49,11 +49,11 @@ public:
 	}
 private:
 	int readMaterialDataFile(const std::string &fpath, const std::string &mat_fname, std::vector<std::string> &m_datanames, int num_data, std::vector<std::string> &m_headers, std::vector<size_t> &m_header_marker_per_data, std::vector<double> &m_ele_val);
-	void getInternalNodes(const std::vector<long> &dom_idx, const int idom, std::vector<bool> &sdom_marked, std::vector<Node*> &internal_quad_nodes, std::vector<Node*> &internal_nodes);
+	void findInternalNodes(const std::vector<long> &dom_idx, const int idom, std::vector<bool> &sdom_marked, std::vector<Node*> &internal_quad_nodes, std::vector<Node*> &internal_nodes);
 	void outputRenumedVTK(const std::string fname, const std::string s_nparts, const int num_parts, std::vector<long> &nnodes_sdom_start, long end, std::vector<Node*> &sbd_nodes, const bool is_quad, const bool osdom);
 	void findElementsInSubDomain(const std::vector<Node*>& internal_nodes, std::vector<Elem*>& subdom_internal_elements, std::vector<Elem*>& subdom_ghost_elements);
 	void findGhostNodesInSubDomain(const std::vector<Elem*>& subdom_ghost_elements, const bool is_quad, std::vector<Node*>& dom_ghost_linear_nodes, std::vector<Node*>& dom_ghost_quad_nodes);
-	long makeSubDomainNodeList(long node_id_shift, const std::vector<Node*>& internal_nodes, const std::vector<Node*>& internal_quad_nodes, const std::vector<Node*>& dom_ghost_linear_nodes, const std::vector<Node*>& dom_ghost_quad_nodes, std::vector<Node*>& sbd_nodes);
+	long addSubDomainNodes(long node_id_shift, const std::vector<Node*>& internal_nodes, const std::vector<Node*>& internal_quad_nodes, const std::vector<Node*>& dom_ghost_linear_nodes, const std::vector<Node*>& dom_ghost_quad_nodes, std::vector<Node*>& sbd_nodes);
 	void writeMatData(int num_data, const std::vector<std::string>& m_datanames, const std::string& dom_str, const std::vector<size_t>& m_header_marker_per_data, const std::vector<std::string>& m_headers, const long n_all_elements, const long nei_size, const std::vector<Elem*>& subdom_internal_elements, const std::string& deli, const std::vector<double>& m_ele_val, const std::vector<Elem*>& subdom_ghost_elements);
 	void outputSubDomainVTK(int idom, const std::string &fname, const std::string &dom_str, const std::string &s_nparts,
 			std::vector<Node*> &sbd_nodes, std::vector<Elem*> &subdom_internal_elements, std::vector<Elem*> &subdom_ghost_elements,

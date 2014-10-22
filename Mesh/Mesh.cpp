@@ -829,7 +829,7 @@ void Mesh::ConstructSubDomain_by_Elements(const string fname, const int num_part
 	//delete nod_dom;
 }
 
-void Mesh::getInternalNodes(const vector<long> &node_dom_idx, const int idom, vector<bool> &sdom_marked, vector<Node*> &internal_quad_nodes, vector<Node*> &internal_nodes)
+void Mesh::findInternalNodes(const vector<long> &node_dom_idx, const int idom, vector<bool> &sdom_marked, vector<Node*> &internal_quad_nodes, vector<Node*> &internal_nodes)
 {
 	for (size_t j = 0; j < node_dom_idx.size(); j++)
 	{
@@ -1056,7 +1056,7 @@ void Mesh::findGhostNodesInSubDomain(const vector<Elem*>& subdom_ghost_elements,
 	}
 }
 
-long Mesh::makeSubDomainNodeList(long node_id_shift, const vector<Node*>& internal_nodes, const vector<Node*>& internal_quad_nodes, const vector<Node*>& dom_ghost_linear_nodes, const vector<Node*>& dom_ghost_quad_nodes, vector<Node*>& sbd_nodes)
+long Mesh::addSubDomainNodes(long node_id_shift, const vector<Node*>& internal_nodes, const vector<Node*>& internal_quad_nodes, const vector<Node*>& dom_ghost_linear_nodes, const vector<Node*>& dom_ghost_quad_nodes, vector<Node*>& sbd_nodes)
 {
 	// make a list of domain nodes
 	long new_node_idx = node_id_shift;
@@ -1257,7 +1257,7 @@ void Mesh::ConstructSubDomain_by_Nodes(const string fname, const string fpath, c
 		// Find and mark internal nodes
 		vector<Node*> internal_nodes; // both linear and quad
 		vector<Node*> internal_quad_nodes; // only quad
-		getInternalNodes(vec_node_dom_idx, idom, vec_node_dom_marked, internal_quad_nodes, internal_nodes);
+		findInternalNodes(vec_node_dom_idx, idom, vec_node_dom_marked, internal_quad_nodes, internal_nodes);
 		nnodes_sdom_linear_elements[idom] = static_cast<long>(internal_nodes.size() - internal_quad_nodes.size());
 		nnodes_sdom_quadratic_elements[idom] = static_cast<long>(internal_nodes.size());
 		const long size_sbd_nodes0 = static_cast<long>(internal_nodes.size()); // Nodes in this domain
@@ -1278,7 +1278,7 @@ void Mesh::ConstructSubDomain_by_Nodes(const string fname, const string fpath, c
 		findGhostNodesInSubDomain(subdom_ghost_elements, is_quad, dom_ghost_linear_nodes, dom_ghost_quad_nodes);
 
 		// make a list of domain nodes
-		makeSubDomainNodeList(node_id_shift, internal_nodes, internal_quad_nodes, dom_ghost_linear_nodes, dom_ghost_quad_nodes, sbd_nodes);
+		addSubDomainNodes(node_id_shift, internal_nodes, internal_quad_nodes, dom_ghost_linear_nodes, dom_ghost_quad_nodes, sbd_nodes);
 		const long size_sbd_nodes = static_cast<long>(sbd_nodes.size()) - nnodes_previous_sdom;
 
 		// Count the total integer variables of this subdomain
