@@ -999,11 +999,14 @@ void Mesh::findElementsInSubDomain(const vector<Node*>& internal_nodes, vector<E
 			a_elem->Marking(true);
 			vector<int> ng_nodes; // non ghost nodes in ghost elements
 			vector<int> g_nodes; // ghost nodes in ghost elements
+			vector<int> ngl_nodes; // ghost nodes in ghost elements
 			for (int kk = 0; kk < a_elem->getNodesNumber(useQuadratic); kk++)
 			{
-				if (a_elem->getNode(kk)->getStatus())
+				if (a_elem->getNode(kk)->getStatus()) {
 					ng_nodes.push_back(kk);
-				else
+					if (a_elem->getNode(kk)->isQuadratic())
+						ngl_nodes.push_back(kk);
+				} else
 					g_nodes.push_back(kk);
 			}
 			// All nodes of this element are inside this subdomain
@@ -1016,7 +1019,7 @@ void Mesh::findElementsInSubDomain(const vector<Node*>& internal_nodes, vector<E
 				subdom_ghost_elements.push_back(a_elem);
 				// set ghost nodes
 				const int nn_gl = static_cast<int>(ng_nodes.size());
-				a_elem->nnodes_gl = nn_gl;
+				a_elem->nnodes_gl = ngl_nodes.size();
 				a_elem->ghost_nodes.resize(nn_gl);
 				for (int kk = 0; kk < nn_gl; kk++)
 					a_elem->ghost_nodes[kk] = ng_nodes[kk];
