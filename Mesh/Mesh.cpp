@@ -1354,11 +1354,9 @@ void Mesh::ConstructSubDomain_by_Nodes(const string fname, const string fpath, c
 	// re-number global node index
 	size_t global_node_id = 0;
 	for (size_t i=0; i<vec_linear_nodes.size(); i++) {
-		assert(vec_linear_nodes[i]->index < this->NodesNumber_Linear);
 		vec_linear_nodes[i]->index = global_node_id++;
 	}
 	for (size_t i=0; i<vec_quad_nodes.size(); i++) {
-		Node* anode = vec_quad_nodes[i];
 		vec_quad_nodes[i]->index = global_node_id++;
 	}
 
