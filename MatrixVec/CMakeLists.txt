@@ -6,7 +6,7 @@ set( Math_SOURCES
       SymMatrix.h
       SymMatrix.cpp
       vec.h
-      vec.cpp
+      vec.hpp
 )
 
 #include_directories(

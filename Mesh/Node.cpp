@@ -20,6 +20,7 @@ Node:: Node(const int Index, const double x,
    Coordinate[1] =y;
    Coordinate[2] =z;
    local_index = -1;
+   _is_quadratic = false;
 }
 //    WW. 06.2005
 void Node::operator = (const Node& n)
@@ -29,6 +30,7 @@ void Node::operator = (const Node& n)
    Coordinate[0] = n.Coordinate[0];
    Coordinate[1] = n.Coordinate[1];
    Coordinate[2] = n.Coordinate[2];
+   _is_quadratic = n._is_quadratic;
 }
 //    WW. 06.2005
 bool Node::operator == (const Node& n)

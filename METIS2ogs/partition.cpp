@@ -297,10 +297,32 @@ int main(int argc, char* argv[])
       case ogs2metis:
          s_buff = fname+".mesh";
          ofile.open(s_buff.c_str(), ios::out | ios::trunc );
+         if(quad)
+         {
+            a_mesh->setOrder(false);
+            a_mesh->ConstructGrid();
+            a_mesh->GenerateHighOrderNodes();
+            a_mesh->setOrder(true);
+         }
          a_mesh->Write2METIS(ofile);
+         {
+             string vtk_name = fname+".vtk";
+             ofstream of_vtk(vtk_name.c_str());
+             a_mesh->WriteVTK_Vertex(of_vtk);
+             of_vtk.close();
+         }
 
          break;
       case metis2ogs:
+          if(quad)
+          {
+             cout<<"\n***Construct linear mesh"<<endl;
+             a_mesh->setOrder(false);
+             a_mesh->ConstructGrid();
+             cout<<"\n***Compute quad order mesh"<<endl;
+             a_mesh->GenerateHighOrderNodes(); //TODO should be read from a file in the future
+             a_mesh->setOrder(true);
+          }
          cout<<"\n***Compute mesh topology"<<endl;
          a_mesh->ConstructGrid();
 
@@ -333,14 +355,8 @@ int main(int argc, char* argv[])
          if(part_type == by_element)
             a_mesh->ConstructSubDomain_by_Elements(fname.c_str(), nparts, out_subdom);
          else if(part_type == by_node)
-         {
-            if(quad)
-            {
-               a_mesh->GenerateHighOrderNodes();
-            }
-
             a_mesh->ConstructSubDomain_by_Nodes(fname.c_str(), fpath, mat_file_name, nparts, quad, out_subdom);
-         }
+
          break;
       default:
          break;

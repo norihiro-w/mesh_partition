@@ -23,6 +23,7 @@ class Node:public Grain
       Node(const int Index):Grain(Index)
       {
          Coordinate = new double[3];
+         _is_quadratic = false;
       }
       Node(const int Index, const double x,
            const double y, const double z=0.0);
@@ -80,6 +81,9 @@ class Node:public Grain
          return local_index;
       }
 
+      bool isQuadratic() const { return _is_quadratic; }
+      void isQuadratic(bool quad) { _is_quadratic = quad; }
+
       // Output
       void Write(std::ostream& os = std::cout) const;
       void WriteCoordinates(std::ostream& os = std::cout) const;
@@ -87,6 +91,7 @@ class Node:public Grain
    private:
       double *Coordinate;
       long local_index; // For domain decomposition
+      bool _is_quadratic;
       std::vector<long>  ElementsRelated;
       std::vector<long>  NodesRelated;
       friend class Mesh_Group::Edge;

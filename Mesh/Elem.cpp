@@ -576,8 +576,8 @@ void Elem::WriteSubDOM(ostream& os, const long node_id_shift, bool quad) const
    os<<PatchIndex<<" "<<ele_Type+1<<" "<<nn<<" ";
    for(int i=0; i<nn; i++)
    {
-//      nodes_index[i] = nodes[i]->getIndex();
-      os<<nodes[i]->getIndex()-node_id_shift<<" ";
+	   os << nodes[i]->getIndex() << " ";
+//      os<<nodes[i]->getIndex()-node_id_shift<<" ";
    }
    os<<endl;
 }
@@ -652,12 +652,12 @@ void Elem::Write_index(ostream& os) const
     string deli = " ";
    if(nodes.Size()>0)
    {
-      for(int i=0; i<nnodes; i++)
+      for(int i=0; i<getNodesNumber(quadratic); i++)
          os<<nodes[i]->index+1<<deli;
    }
    else
    {
-      for(int i=0; i<nnodes; i++)
+      for(int i=0; i<getNodesNumber(quadratic); i++)
          os<<nodes[i]->index + 1<<deli;
    }
    os<<endl;

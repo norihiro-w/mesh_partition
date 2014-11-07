@@ -60,15 +60,16 @@ template<class T> class vec
       int size;
 
 };
-template<> class vec<void*>
+
+template<class T> class vec<T*>
 {
    public:
       vec(const int argSize);
-      vec()
+      vec() : entry(NULL)
       {
          size=0;
       }
-      explicit vec(const vec<void*>& v);
+      explicit vec(const vec<T*>& v);
 
       virtual ~vec();
       // Operator
@@ -76,22 +77,22 @@ template<> class vec<void*>
       {
          for (int i=0; i<size; i++) entry[i] = v;
       }
-      void operator = (const vec<void*>& v);
-      void*& operator[] (int i)
+      void operator = (const vec<T*>& v);
+      T*& operator[] (int i)
       {
          return entry[i];
       }
-      const void*& operator[] (int i) const
+      const T*& operator[] (int i) const
       {
-         return (const void*&) entry[i];
+         return (const T*&) entry[i];
       }
 
       // Access to memebers
-      void** Entry()
+      T** Entry()
       {
          return entry;
       }
-      const void** Entry()  const
+      const T** Entry()  const
       {
          return (const void**)entry;
       }
@@ -104,47 +105,13 @@ template<> class vec<void*>
       virtual void Write(std::ostream& os = std::cout) const;
 
    protected:
-      void** entry;
+      T** entry;
       int size;
-};
-
-template<class T> class vec<T*> : public vec<void*>
-{
-   public:
-      vec(const int Size) : vec<void*>(Size) { }
-      vec()               : vec<void*>()     { }
-      explicit vec(const vec<T*>& v) : vec<void*>(v) { }
-
-      ~vec() { }
-
-      // Operator
-      void operator = (T* v)
-      {
-         for (int i=0; i<size; i++) entry[i] = v;
-      }
-      void operator = (const vec<T*>& v);
-      T*& operator[] (int i)
-      {
-         return (T*&) entry[i];
-      }
-      const T*& operator[] (int i) const
-      {
-         return (const T*&) entry[i];
-      }
-
-      T** Entry()
-      {
-         return entry;
-      }
-      T** Entry()  const
-      {
-         return (const T**)entry;
-      }
-
-
 };
 
 }
 //==========================================================================
+
+#include "vec.hpp"
 
 #endif
