@@ -1211,7 +1211,15 @@ void Mesh::ConstructSubDomain_by_Nodes(const string fname, const string fpath, c
 	// -------------------------------------------------------------------------
 	vector<bool> vec_node_dom_marked(n_all_nodes);
 	vector<long> vec_node_dom_idx(nnodes_in_usage);
-	read_npart_file(num_parts, fname, vec_node_dom_idx, vec_node_dom_marked);
+	if (num_parts == 1) {
+		for(long i=0; i<n_all_nodes; i++)
+		{
+			vec_node_dom_idx[i] = 0;
+			vec_node_dom_marked[i] = false;
+		}
+	} else {
+		read_npart_file(num_parts, fname, vec_node_dom_idx, vec_node_dom_marked);
+	}
 
 	// -------------------------------------------------------------------------
 	// open partitioned file and write header
