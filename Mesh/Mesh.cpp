@@ -1267,49 +1267,66 @@ void Mesh::ConstructSubDomain_by_Nodes(const string fname, const string fpath, c
 		cout << "Process partition: " << idom << endl;
 		nnodes_sdom_start[idom] = nnodes_previous_sdom;
 
-		// Un-making all nodes and elements of the whole mesh
-		for (long j = 0; j < n_all_nodes; j++)
-			node_vector[j]->Marking(false);
-		for (long j = 0; j < n_all_elements; j++)
-			elem_vector[j]->Marking(false);
-
-		// Find and mark internal nodes
+		long size_sbd_nodes = 0;
 		vector<Node*> internal_nodes; // both linear and quad
 		vector<Node*> internal_quad_nodes; // only quad
-		findInternalNodes(vec_node_dom_idx, idom, vec_node_dom_marked, internal_quad_nodes, internal_nodes);
-		nnodes_sdom_linear_elements[idom] = static_cast<long>(internal_nodes.size() - internal_quad_nodes.size());
-		nnodes_sdom_quadratic_elements[idom] = static_cast<long>(internal_nodes.size());
-		for (size_t j = 0; j < internal_nodes.size(); j++)
-		{
-			Node* a_node = internal_nodes[j];
-			a_node->Marking(true);
-			a_node->local_index = j + node_id_shift; //internal node id should be continuous
-
-			if (internal_nodes[j]->isQuadratic())
-				vec_linear_nodes.push_back(internal_nodes[j]);
-			else
-				vec_quad_nodes.push_back(internal_nodes[j]);
-		}
-
-		// Find elements in this domain
+		vector<Node*> dom_ghost_linear_nodes, dom_ghost_quad_nodes;
 		vector<Elem*> subdom_internal_elements;
 		vector<Elem*> subdom_ghost_elements;
-		findElementsInSubDomain(internal_nodes, subdom_internal_elements, subdom_ghost_elements);
+		if (num_parts==1) {
+			for (long j = 0; j < n_all_nodes; j++) {
+				internal_nodes.push_back(node_vector[j]);
+				//if (node_vector[j]->isQuadratic())
+                if (node_vector[j]->index >= NodesNumber_Linear)
+					internal_quad_nodes.push_back(node_vector[j]);
+				sbd_nodes.push_back(node_vector[j]);
+                internal_nodes[j]->local_index = j;
+			}
+			for (long j = 0; j < n_all_elements; j++)
+				subdom_internal_elements.push_back(elem_vector[j]);
+			size_sbd_nodes = n_all_nodes;
+		} else {
+			// Un-making all nodes and elements of the whole mesh
+			for (long j = 0; j < n_all_nodes; j++)
+				node_vector[j]->Marking(false);
+			for (long j = 0; j < n_all_elements; j++)
+				elem_vector[j]->Marking(false);
 
-		// Find ghost nodes
-		vector<Node*> dom_ghost_linear_nodes, dom_ghost_quad_nodes;
-		findGhostNodesInSubDomain(subdom_ghost_elements, is_quad, dom_ghost_linear_nodes, dom_ghost_quad_nodes);
+			// Find and mark internal nodes
+			findInternalNodes(vec_node_dom_idx, idom, vec_node_dom_marked, internal_quad_nodes, internal_nodes);
+			nnodes_sdom_linear_elements[idom] = static_cast<long>(internal_nodes.size() - internal_quad_nodes.size());
+			nnodes_sdom_quadratic_elements[idom] = static_cast<long>(internal_nodes.size());
+			for (size_t j = 0; j < internal_nodes.size(); j++)
+			{
+				Node* a_node = internal_nodes[j];
+				a_node->Marking(true);
+				a_node->local_index = j + node_id_shift; //internal node id should be continuous
 
-		// make a list of domain nodes
-		addSubDomainNodes(node_id_shift, internal_nodes, internal_quad_nodes, dom_ghost_linear_nodes, dom_ghost_quad_nodes, sbd_nodes);
-		const long size_sbd_nodes = static_cast<long>(sbd_nodes.size()) - nnodes_previous_sdom;
+				if (internal_nodes[j]->isQuadratic())
+					vec_linear_nodes.push_back(internal_nodes[j]);
+				else
+					vec_quad_nodes.push_back(internal_nodes[j]);
+			}
 
+			// Find elements in this domain
+			findElementsInSubDomain(internal_nodes, subdom_internal_elements, subdom_ghost_elements);
+
+			// Find ghost nodes
+			findGhostNodesInSubDomain(subdom_ghost_elements, is_quad, dom_ghost_linear_nodes, dom_ghost_quad_nodes);
+
+			// make a list of domain nodes
+			addSubDomainNodes(node_id_shift, internal_nodes, internal_quad_nodes, dom_ghost_linear_nodes, dom_ghost_quad_nodes, sbd_nodes);
+			size_sbd_nodes = static_cast<long>(sbd_nodes.size()) - nnodes_previous_sdom;
+
+		}
+
+		long nmb_element_idxs = 0, nmb_element_idxs_g = 0;
 		// Count the total integer variables of this subdomain
-		long nmb_element_idxs = 3 * subdom_internal_elements.size();
+		nmb_element_idxs = 3 * subdom_internal_elements.size();
 		for (size_t j = 0; j < subdom_internal_elements.size(); j++)
 			nmb_element_idxs += subdom_internal_elements[j]->getNodesNumber(is_quad);
 		//  mat index, element type, number of element, number of ghost nodes, number of ghost nodes of high order elements
-		long nmb_element_idxs_g = 5 * subdom_ghost_elements.size();
+		nmb_element_idxs_g = 5 * subdom_ghost_elements.size();
 		for (size_t j = 0; j < subdom_ghost_elements.size(); j++)
 		{
 			nmb_element_idxs_g += subdom_ghost_elements[j]->getNodesNumber(is_quad);
