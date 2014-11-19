@@ -1276,9 +1276,11 @@ void Mesh::ConstructSubDomain_by_Nodes(const string fname, const string fpath, c
 		if (num_parts==1) {
 			for (long j = 0; j < n_all_nodes; j++) {
 				internal_nodes.push_back(node_vector[j]);
-				if (node_vector[j]->isQuadratic())
+				//if (node_vector[j]->isQuadratic())
+                if (node_vector[j]->index >= NodesNumber_Linear)
 					internal_quad_nodes.push_back(node_vector[j]);
 				sbd_nodes.push_back(node_vector[j]);
+                internal_nodes[j]->local_index = j;
 			}
 			for (long j = 0; j < n_all_elements; j++)
 				subdom_internal_elements.push_back(elem_vector[j]);
@@ -1405,7 +1407,7 @@ void Mesh::ConstructSubDomain_by_Nodes(const string fname, const string fpath, c
 	os_subd.clear();
 	os_subd.close();
 
-	//outputRenumedVTK(fname, s_nparts, num_parts, nnodes_sdom_start, end, sbd_nodes, is_quad, outut_subdomains);
+	outputRenumedVTK(fname, s_nparts, num_parts, nnodes_sdom_start, end, sbd_nodes, is_quad, outut_subdomains);
 }
 
 // 02.2012. WW
