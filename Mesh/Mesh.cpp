@@ -468,12 +468,38 @@ void Mesh::GenerateHighOrderNodes()
 	bool done;
 	double x0, y0, z0;
 
+
+	// Set neighbors of node. All elements, even in deactivated subdomains, are taken into account here.
+	for (e = 0; e < (long) node_vector.size(); e++)
+		node_vector[e]->getConnectedElementIDs().clear();
+	done = false;
+	const long ele_vector_size(elem_vector.size());
+	for (e = 0; e < ele_vector_size; e++)
+	{
+		Elem* thisElem0 = elem_vector[e];
+		for (i = 0; i < thisElem0->getNodesNumber(false); i++)
+		{
+			done = false;
+			long ni = thisElem0->getNodeIndex(i);
+			size_t n_connected_elements(node_vector[ni]->getConnectedElementIDs().size());
+			for (size_t j = 0; j < n_connected_elements; j++)
+				if (e == node_vector[ni]->getConnectedElementIDs()[j])
+				{
+					done = true;
+					break;
+				}
+			if (!done)
+				node_vector[ni]->getConnectedElementIDs().push_back(e);
+		}
+	}
+
 	clock_t start, finish;
 	start = clock();
 
 	//
 	Node *aNode = NULL;
 	vec<Node*> e_nodes0(20);
+	vec<Node*> e_nodes(20);
 	Elem *thisElem0 = NULL;
 	Elem *thisElem = NULL;
 #ifdef BUILD_MESH_EDGE
@@ -484,15 +510,19 @@ void Mesh::GenerateHighOrderNodes()
 	NodesNumber_Linear = (long) node_vector.size();
 	// Loop over elements
 	e_size = (long) elem_vector.size();
+	bool hasLines = false;
 	for (e = 0; e < e_size; e++)
 	{
 		thisElem0 = elem_vector[e];
+		if (thisElem0->getElementType() == Mesh_Group::line) {
+			hasLines = true;
+			continue;
+		}
 		nnodes0 = thisElem0->nnodes; // Number of nodes for linear element
-//      thisElem0->GetNodeIndeces(node_index_glb0);
+		//thisElem0->GetNodeIndeces(node_index_glb0);
 		for (i = 0; i < nnodes0; i++) // Nodes
 			e_nodes0[i] = thisElem0->getNode(i);
 		// --------------------------------
-
 		// Edges
 		nedges0 = thisElem0->getEdgesNumber();
 		// Check if there is any neighbor that has new middle points
@@ -501,7 +531,6 @@ void Mesh::GenerateHighOrderNodes()
 #ifdef BUILD_MESH_EDGE
 			thisEdge0 = thisElem0->getEdge(i);
 #endif
-
 			thisElem0->getLocalIndices_EdgeNodes(i, edgeIndex_loc0);
 			const long ena0 = thisElem0->getNodeIndex(edgeIndex_loc0[0]);
 			const long ena1 = thisElem0->getNodeIndex(edgeIndex_loc0[1]);
@@ -516,11 +545,11 @@ void Mesh::GenerateHighOrderNodes()
 					if (ee == e)
 						continue;
 					thisElem = elem_vector[ee];
+					nedges = thisElem->getEdgesNumber();
 
 					// If this element already proccessed
 					if (thisElem->nodes.Size() == thisElem->getNodesNumberHQ())
 					{
-						nedges = thisElem->getEdgesNumber();
 						// Edges of neighbors
 						for (ii = 0; ii < nedges; ii++)
 						{
@@ -592,6 +621,91 @@ void Mesh::GenerateHighOrderNodes()
 		thisElem0->setNodes(e_nodes0, true);
 	} // Over elements
 	  //
+
+	// Setup 1d line elements at the end
+	if (hasLines)
+	{
+		for (e = 0; e < e_size; e++)
+		{
+			thisElem0 = elem_vector[e];
+			if (thisElem0->getElementType() != Mesh_Group::line)
+				continue;
+
+			nnodes0 = thisElem0->nnodes;
+			for (int i = 0; i < nnodes0; i++)
+				e_nodes0[i] = thisElem0->getNode(i);
+
+			done = false;
+
+			for (int i = 0; i < thisElem0->getFacesNumber(); i++)
+			{
+				thisElem = thisElem0->getNeighbor(i);
+				// look for adjacent solid elements
+				if (thisElem->getElementType() == Mesh_Group::line)
+					continue;
+
+				for (int j = 0; j < thisElem->nnodes; j++)
+					e_nodes[j] = thisElem->getNode(j);
+				nedges = thisElem->getEdgesNumber();
+				// search a edge connecting to this line element
+				for (int j = 0; j < nedges; j++)
+				{
+					thisEdge = thisElem->getEdge(j);
+					thisElem->getLocalIndices_EdgeNodes(j, edgeIndex_loc0);
+					// Check neighbors
+					for (k = 0; k < 2; k++)
+					{
+						e_size_l = (long) e_nodes[edgeIndex_loc0[k]]->getConnectedElementIDs().size();
+						for (ei = 0; ei < e_size_l; ei++)
+						{
+							ee = e_nodes[edgeIndex_loc0[k]]->getConnectedElementIDs()[ei];
+							if (elem_vector[ee] != thisElem0)
+								continue;
+							//the edge is found now
+							aNode = thisEdge->getNode(2);
+							if (aNode) // The middle point exist
+							{
+								e_nodes0[nnodes0] = aNode;
+								nnodes0++;
+								done = true;
+								break;
+							}
+							if (done)
+								break;
+						} // for(ei=0; ei<e_size_l; ei++)
+						if (done)
+							break;
+					} //for(k=0;k<2;k++)
+					if (done)
+						break;
+				} //  for(i=0; i<nedges0; i++)
+				if (done)
+					break;
+			}
+			if (!done)
+			{
+				aNode = new Node((long) node_vector.size());
+				for (int i = 0; i < nnodes0; i++) // Nodes
+				{
+					x0 += e_nodes0[i]->X();
+					y0 += e_nodes0[i]->Y();
+					z0 += e_nodes0[i]->Z();
+				}
+				x0 /= (double) nnodes0;
+				y0 /= (double) nnodes0;
+				z0 /= (double) nnodes0;
+				aNode->setX(x0);
+				aNode->setY(y0);
+				aNode->setZ(z0);
+				e_nodes0[nnodes0] = aNode;
+				nnodes0++;
+				node_vector.push_back(aNode);
+			}
+			thisElem0->setOrder(true);
+			thisElem0->setNodes(e_nodes0, true);
+		}
+	}
+
 	NodesNumber_Quadratic = (long) node_vector.size();
 	for (e = 0; e < e_size; e++)
 	{

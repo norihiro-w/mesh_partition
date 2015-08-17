@@ -88,6 +88,9 @@ class Node:public Grain
       void Write(std::ostream& os = std::cout) const;
       void WriteCoordinates(std::ostream& os = std::cout) const;
 
+      std::vector<long> const& getConnectedElementIDs() const { return ElementsRelated; }
+      std::vector<long> & getConnectedElementIDs() { return ElementsRelated; }
+
    private:
       double *Coordinate;
       long local_index; // For domain decomposition

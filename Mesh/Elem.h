@@ -79,11 +79,11 @@ class Elem:public Grain
       void getNodeIndeces(long  *node_index) const
       {
          for (int i=0; i< (int) nodes.Size(); i++)
-			 node_index[i]= nodes[i]->index;
+            node_index[i]= nodes[i]->index;
       }
       long getNodeIndex(const int loc_lndex) const
       {
-		  return nodes[loc_lndex]->index;
+         return nodes[loc_lndex]->index;
       }
       void setNodes(Math_Group::vec<Node*>&  ele_nodes, const bool ReSize=false);
       void getNodes(Math_Group::vec<Node*>&  ele_nodes)
@@ -133,6 +133,10 @@ class Elem:public Grain
       void getNeighbors(Math_Group::vec<Elem*>&  ele_neighbors)
       {
          for (int i=0; i< nfaces; i++) ele_neighbors[i]= neighbors[i];
+      }
+      Elem* getNeighbor(int i)
+      {
+        return neighbors[i];
       }
       //Domain partition
       long getDomNodeIndex(const int loc_index)

@@ -118,10 +118,11 @@ MatrixVec
 ##
 #		)
 
+add_definitions(-DBUILD_MESH_EDGE)
+
 ADD_SUBDIRECTORY( MatrixVec )
 ADD_SUBDIRECTORY( Mesh )
 ADD_SUBDIRECTORY( METIS2ogs )
-
 
 
 		

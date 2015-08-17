@@ -66,7 +66,7 @@ void OptionList()
    cout << s_intro<<endl<<endl;
    cout << "Tasks:\n  --version\n  --help\n  --ogs2metis\n  --metis2ogs\n"<<endl;
    cout << "Option for --metis2ogs task:"<<endl;
-   //A bug here cout << "  -q                : generate quadratic elements. It can be ommitted if quadratic element is not used."<<endl;
+   cout << "  -q                : generate quadratic elements. It can be ommitted if quadratic element is not used."<<endl;
    cout << "  -np [number]      : define the number of partitions."<<endl;
    cout << "  -e                : partition by element (non overlapped subdomain)"<<endl;
    cout << "  -n                : partition by node (overlapped subdomain)"<<endl;
