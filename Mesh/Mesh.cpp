@@ -1050,6 +1050,15 @@ void read_npart_file(const int num_parts, const string fname, vector<long> &vec_
 
 void Mesh::outputRenumedVTK(const std::string fname, const std::string s_nparts, const int num_parts, std::vector<long> &nnodes_sdom_start, long end, std::vector<Node*> &sbd_nodes, const bool is_quad, const bool osdom)
 {
+	std::string filename_nodeids = fname + "_nodeid_mapping_" + s_nparts + ".txt";
+	ofstream osmap(filename_nodeids.c_str(), ios::out | ios::trunc);
+	for (std::size_t i=0; i<node_vector.size(); i++)
+	{
+		Node* a_node = node_vector[i];
+		osmap << i << " " << a_node->local_index << "\n";
+	}
+	osmap.close();
+
 	std::string f_iparts = fname + "_renum_" + s_nparts + ".msh";
 	ofstream os(f_iparts.c_str(), ios::out | ios::trunc);
 	// Output renumbered mesh

@@ -86,7 +86,7 @@ void FindFileNameInCommand(stringstream &ss, string &fname)
    }
 }
 
-enum Task {metis2ogs, ogs2metis};
+enum Task {metis2ogs, ogs2metis, direct};
 enum PartType {by_element, by_node};
 
 int main(int argc, char* argv[])
@@ -107,6 +107,8 @@ int main(int argc, char* argv[])
    string fname;
    string fpath;
    string mat_file_name = "";
+   string direct_file_name = "";
+   string nodeid_map_file_name;
 
    int nparts = 1;
    string str_nparts;
@@ -146,6 +148,16 @@ int main(int argc, char* argv[])
             mat_file_name = argv[i+1];
          }
 
+         if(s_buff.find("-direct")!=string::npos)
+         {
+            direct_file_name = argv[i+1];
+            this_task = direct;
+         }
+
+         if(s_buff.find("-map")!=string::npos)
+         {
+            nodeid_map_file_name = argv[i+1];
+         }
 
          if(s_buff.find("ogs2metis")!=string::npos)
          {
@@ -358,6 +370,47 @@ int main(int argc, char* argv[])
             a_mesh->ConstructSubDomain_by_Nodes(fname.c_str(), fpath, mat_file_name, nparts, quad, out_subdom);
 
          break;
+      case direct:
+      {
+          // read the original direct file
+          std:ifstream org_direct_file(direct_file_name);
+          if (!org_direct_file) {
+              std::cout << "*** error: cannot open " << direct_file_name << std::endl;
+              break;
+          }
+          std::vector<long> node_ids;
+          std::vector<double> node_values;
+          std::string line;
+          while (std::getline(org_direct_file, line))
+          {
+              if (line.empty()) continue;
+              std::stringstream ss(line);
+              long nodeid = 0;
+              double value = 0;
+              if (ss >> nodeid >> value) {
+                  node_ids.push_back(nodeid);
+                  node_values.push_back(value);
+              }
+          }
+          org_direct_file.close();
+          // write the new direct file for each subdomain
+          for (int idom=0; idom<nparts; idom++)
+          {
+              std::stringstream ss;
+              ss << (direct_file_name + "_") << idom;
+              std:ofstream new_direct_file(ss.str());
+              if (!new_direct_file) {
+                  std::cout << "*** error: cannot open " << ss.str() << std::endl;
+                  break;
+              }
+              for (long i=0; i<dom_nnodes; i++)
+              {
+                  new_direct_file << i << " " << node_values[i] << "\n";
+              }
+              new_direct_file.close();
+          }
+      }
+          break;
       default:
          break;
    }
