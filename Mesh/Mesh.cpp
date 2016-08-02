@@ -1,12 +1,12 @@
 #include "Mesh.h"
 
 #include <algorithm>
-#include <sstream>
+#include <cfloat>
+#include <cmath>
 #include <cstdlib>
 #include <iomanip>
-#include <cmath>
-#include <cfloat>
 #include <limits>
+#include <sstream>
 
 #include "Node.h"
 #include "Edge.h"
@@ -119,45 +119,34 @@ void Mesh::ConnectedNodes(bool quadratic)
  **************************************************************************/
 void Mesh::ConnectedElements2Node(bool quadratic)
 {
-	long i, j, e, ni;
-	Elem* thisElem0 = NULL;
-	Node * node = NULL;
-	bool done = false;
+	for (auto node :  node_vector)
+		node->ElementsRelated.clear();
 	// set neighbors of node
-	for (e = 0; e < (long) node_vector.size(); e++)
-		node_vector[e]->ElementsRelated.clear();
-	for (e = 0; e < (long) elem_vector.size(); e++)
+	for (long e = 0; e < (long) elem_vector.size(); e++)
 	{
-		thisElem0 = elem_vector[e];
+		auto thisElem0 = elem_vector[e];
 		if (!thisElem0->getStatus())
 			continue;      // Not marked for use
-		for (i = 0; i < thisElem0->getNodesNumber(quadratic); i++)
+		for (int i = 0; i < thisElem0->getNodesNumber(quadratic); i++)
 		{
-			done = false;
-			ni = thisElem0->getNodeIndex(i);
-			node = node_vector[ni];
-			for (j = 0; j < (int) node->ElementsRelated.size(); j++)
+			bool found = false;
+			auto node = node_vector[thisElem0->getNodeIndex(i)];
+			for (int j = 0; j < (int) node->ElementsRelated.size(); j++)
 			{
 				if (e == node->ElementsRelated[j])
 				{
-					done = true;
+					found = true;
 					break;
 				}
 			}
-			if (!done)
+			if (!found)
 				node->ElementsRelated.push_back(e);
 		}
 	}
 }
+
 void Mesh::ConstructGrid()
 {
-	int counter;
-	int i, j, k, ii, jj, m0, m, n0, n;
-	int nnodes0;
-	long e, ei, ee, e_size, e_size_l;
-	bool done;
-	double x_sum, y_sum, z_sum;
-
 	int faceIndex_loc0[10];
 	int faceIndex_loc[10];
 	vec<Node*> e_nodes0(20);
@@ -165,7 +154,6 @@ void Mesh::ConstructGrid()
 	long node_index_glb0[20];
 
 #ifdef BUILD_MESH_EDGE
-	int nedges0, nedges;
 	int edgeIndex_loc0[3];
 	int edgeIndex_loc[3];
 	vec<int> Edge_Orientation(15);
@@ -178,15 +166,12 @@ void Mesh::ConstructGrid()
 
 	vec<Node*> e_edgeNodes0(3);
 	vec<Node*> e_edgeNodes(3);
-	Elem* thisElem0 = NULL;
-	Elem* thisElem = NULL;
 
 	clock_t start, finish;
 	start = clock();
 
 	//Elem->nodes not initialized
 
-	e_size = (long) elem_vector.size();
 	if (NodesNumber_Linear == 0)
 		NodesNumber_Linear = (long) node_vector.size();
 
@@ -197,45 +182,53 @@ void Mesh::ConstructGrid()
 
 	//----------------------------------------------------------------------
 	// Compute neighbors and edges
-	for (e = 0; e < e_size; e++)
+	auto const n_elements = (long) elem_vector.size();
+	for (long e0_id = 0; e0_id < n_elements; e0_id++)
 	{
-		thisElem0 = elem_vector[e];
+		auto thisElem0 = elem_vector[e0_id];
 		thisElem0->setOrder(useQuadratic);
-		nnodes0 = thisElem0->getNodesNumber(useQuadratic);
+		// get nodes
+		const int nnodes0 = thisElem0->getNodesNumber(useQuadratic);
 		thisElem0->getNodeIndeces(node_index_glb0);
-		thisElem0->getNeighbors(Neighbors0);
-		for (i = 0; i < nnodes0; i++) // Nodes
+		for (int i = 0; i < nnodes0; i++)
 			e_nodes0[i] = node_vector[node_index_glb0[i]];
-		m0 = thisElem0->getFacesNumber();
-		// neighbors
-		for (i = 0; i < m0; i++) // Faces
+		// get neighbors
+		thisElem0->getNeighbors(Neighbors0);
+		const int nElem0Faces = thisElem0->getFacesNumber();
+		// set neighbors
+		for (int i = 0; i < nElem0Faces; i++)
 		{
 			if (Neighbors0[i])
 				continue;
-			n0 = thisElem0->getElementFaceNodes(i, faceIndex_loc0);
-			done = false;
-			for (k = 0; k < n0; k++)
-			{
-				e_size_l = (long) e_nodes0[faceIndex_loc0[k]]->ElementsRelated.size();
-				for (ei = 0; ei < e_size_l; ei++)
-				{
-					ee = e_nodes0[faceIndex_loc0[k]]->ElementsRelated[ei];
-					if (ee == e)
-						continue;
-					thisElem = elem_vector[ee];
-					thisElem->getNodeIndeces(node_index_glb);
-					thisElem->getNeighbors(Neighbors);
-					m = thisElem->getFacesNumber();
 
-					for (ii = 0; ii < m; ii++) // Faces
+			// look for an element sharing the same face
+			bool foundNeighbor = false;
+			const int nElem0FaceNodes = thisElem0->getElementFaceNodes(i, faceIndex_loc0);
+			for (int k = 0; k < nElem0FaceNodes; k++)
+			{
+				Mesh_Group::Node* face_node = e_nodes0[faceIndex_loc0[k]];
+				const long n_elems_connected_to_face_node = (long) face_node->ElementsRelated.size();
+				for (long ei = 0; ei < n_elems_connected_to_face_node; ei++)
+				{
+					const long conn_ele_id = face_node->ElementsRelated[ei];
+					if (conn_ele_id == e0_id)
+						continue; //skip same element
+
+					Mesh_Group::Elem* connectedElem = elem_vector[conn_ele_id];
+					connectedElem->getNodeIndeces(node_index_glb);
+					connectedElem->getNeighbors(Neighbors);
+					const int nConnElemFaces = connectedElem->getFacesNumber();
+
+					for (int ii = 0; ii < nConnElemFaces; ii++) // Faces of the connected element
 					{
-						n = thisElem->getElementFaceNodes(ii, faceIndex_loc);
-						if (n0 != n)
+						const int nConnElemFaceNodes = connectedElem->getElementFaceNodes(ii, faceIndex_loc);
+						// check if this face is shared
+						if (nElem0FaceNodes != nConnElemFaceNodes)
 							continue;
-						counter = 0;
-						for (j = 0; j < n0; j++)
+						int counter = 0;
+						for (int j = 0; j < nElem0FaceNodes; j++)
 						{
-							for (jj = 0; jj < n; jj++)
+							for (int jj = 0; jj < nConnElemFaceNodes; jj++)
 							{
 								if (node_index_glb0[faceIndex_loc0[j]] == node_index_glb[faceIndex_loc[jj]])
 								{
@@ -244,19 +237,18 @@ void Mesh::ConstructGrid()
 								}
 							}
 						}
-						if (counter == n)
-						{
-							Neighbors0[i] = thisElem;
-							Neighbors[ii] = thisElem0;
-							thisElem->setNeighbor(ii, thisElem0);
-							done = true;
-							break;
-						}
+						if (counter != nConnElemFaceNodes)
+							continue;
+						// found neighbor for this face
+						Neighbors0[i] = connectedElem;
+						Neighbors[ii] = thisElem0;
+						connectedElem->setNeighbor(ii, thisElem0);
+						foundNeighbor = true;
 					}
-					if (done)
+					if (foundNeighbor)
 						break;
 				}
-				if (done)
+				if (foundNeighbor)
 					break;
 			}
 		}
@@ -265,28 +257,29 @@ void Mesh::ConstructGrid()
 #ifdef BUILD_MESH_EDGE
 		// --------------------------------
 		// Edges
-		nedges0 = thisElem0->getEdgesNumber();
+		const int nedges0 = thisElem0->getEdgesNumber();
 		thisElem0->getEdges(Edges0);
-		for(i=0; i<nedges0; i++)
+		for(int i=0; i<nedges0; i++)
 		{
 			thisElem0->getLocalIndices_EdgeNodes(i, edgeIndex_loc0);
 			// Check neighbors
-			done = false;
-			for(k=0; k<2; k++)
+			bool done = false;
+			for(int k=0; k<2; k++)
 			{
-				e_size_l = (long)e_nodes0[edgeIndex_loc0[k]]->ElementsRelated.size();
-				for(ei=0; ei<e_size_l; ei++)
+				auto edge_node = e_nodes0[edgeIndex_loc0[k]];
+				const long nConnElements = (long)edge_node->ElementsRelated.size();
+				for(long ei=0; ei<nConnElements; ei++)
 				{
-					ee = e_nodes0[edgeIndex_loc0[k]]->ElementsRelated[ei];
-					if(ee==e) continue;
-					thisElem = elem_vector[ee];
-					thisElem->getNodeIndeces(node_index_glb);
-					nedges = thisElem->getEdgesNumber();
-					thisElem->getEdges(Edges);
+					auto const connected_element_id = edge_node->ElementsRelated[ei];
+					if(connected_element_id == e0_id) continue;
+					auto connected_element = elem_vector[connected_element_id];
+					connected_element->getNodeIndeces(node_index_glb);
+					connected_element->getEdges(Edges);
 					// Edges of neighbors
-					for(ii=0; ii<nedges; ii++)
+					auto const nConnEleEdges = connected_element->getEdgesNumber();
+					for(int ii=0; ii<nConnEleEdges; ii++)
 					{
-						thisElem->getLocalIndices_EdgeNodes(ii, edgeIndex_loc);
+						connected_element->getLocalIndices_EdgeNodes(ii, edgeIndex_loc);
 						if(( node_index_glb0[edgeIndex_loc0[0]]==node_index_glb[edgeIndex_loc[0]]
 										&&node_index_glb0[edgeIndex_loc0[1]]==node_index_glb[edgeIndex_loc[1]])
 								||( node_index_glb0[edgeIndex_loc0[0]]==node_index_glb[edgeIndex_loc[1]]
@@ -331,7 +324,7 @@ void Mesh::ConstructGrid()
 		thisElem0->setNodes(e_nodes0, true);
 	}      // Over elements
 
-		   // set faces on surfaces and others
+	// set faces on surfaces and others
 	msh_no_line = 0;  // Should be members of mesh
 	msh_no_quad = 0;
 	msh_no_hexs = 0;
@@ -339,9 +332,8 @@ void Mesh::ConstructGrid()
 	msh_no_tets = 0;
 	msh_no_pris = 0;
 	msh_no_pyra = 0;
-	for (e = 0; e < e_size; e++)
+	for (auto thisElem0 : elem_vector)
 	{
-		thisElem0 = elem_vector[e];
 		switch (thisElem0->getElementType())
 		{
 		case line:
@@ -373,7 +365,7 @@ void Mesh::ConstructGrid()
 			continue; // line element
 		thisElem0->getNodeIndeces(node_index_glb0);
 		thisElem0->getNeighbors(Neighbors0);
-		m0 = thisElem0->getFacesNumber();
+		auto const nElem0Faces = thisElem0->getFacesNumber();
 
 #ifdef BUILD_MESH_FACE
 		// Check face on surface
@@ -402,14 +394,14 @@ void Mesh::ConstructGrid()
 	// Node information
 	// 1. Default node index <---> eqs index relationship
 	// 2. Coordiate system flag
-	x_sum = 0.0;
-	y_sum = 0.0;
-	z_sum = 0.0;
-	for (e = 0; e < (long) node_vector.size(); e++)
+	double x_sum = 0.0;
+	double y_sum = 0.0;
+	double z_sum = 0.0;
+	for (long e0_id = 0; e0_id < (long) node_vector.size(); e0_id++)
 	{
-		x_sum += fabs(node_vector[e]->X());
-		y_sum += fabs(node_vector[e]->Y());
-		z_sum += fabs(node_vector[e]->Z());
+		x_sum += fabs(node_vector[e0_id]->X());
+		y_sum += fabs(node_vector[e0_id]->Y());
+		z_sum += fabs(node_vector[e0_id]->Z());
 	}
 	if (x_sum > 0.0 && y_sum < DBL_MIN && z_sum < DBL_MIN)
 		coordinate_system = 10;
