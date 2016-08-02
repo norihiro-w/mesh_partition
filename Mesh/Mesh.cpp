@@ -1,5 +1,6 @@
 #include "Mesh.h"
 
+#include <algorithm>
 #include <sstream>
 #include <cstdlib>
 #include <iomanip>
@@ -637,9 +638,64 @@ void Mesh::GenerateHighOrderNodes()
 
 			done = false;
 
+			std::vector<int> connected_elements;
+			for (int i=0; i<nnodes0; i++)
+				for (auto eid : node_vector[thisElem0->getNodesNumber(i)]->ElementsRelated)
+					connected_elements.push_back(eid);
+			std::sort(connected_elements.begin(), connected_elements.end());
+			connected_elements.erase(std::unique(connected_elements.begin(), connected_elements.end()), connected_elements.end());
+
+			for (auto ele_id : connected_elements)
+			{
+				auto thisElem = elem_vector[ele_id];
+				if (thisElem->getElementType() == Mesh_Group::line)
+					continue;
+
+				for (int j = 0; j < thisElem->nnodes; j++)
+					e_nodes[j] = thisElem->getNode(j);
+				auto const nedges = thisElem->getEdgesNumber();
+				// search a edge connecting to this line element
+				for (int j = 0; j < nedges; j++)
+				{
+					thisEdge = thisElem->getEdge(j);
+					thisElem->getLocalIndices_EdgeNodes(j, edgeIndex_loc0);
+					// Check neighbors
+					for (k = 0; k < 2; k++)
+					{
+						e_size_l = (long) e_nodes[edgeIndex_loc0[k]]->getConnectedElementIDs().size();
+						for (ei = 0; ei < e_size_l; ei++)
+						{
+							ee = e_nodes[edgeIndex_loc0[k]]->getConnectedElementIDs()[ei];
+							if (elem_vector[ee] != thisElem0)
+								continue;
+							//the edge is found now
+							aNode = thisEdge->getNode(2);
+							if (aNode) // The middle point exist
+							{
+								e_nodes0[nnodes0] = aNode;
+								nnodes0++;
+								done = true;
+								break;
+							}
+							if (done)
+								break;
+						} // for(ei=0; ei<e_size_l; ei++)
+						if (done)
+							break;
+					} //for(k=0;k<2;k++)
+					if (done)
+						break;
+				} //  for(i=0; i<nedges0; i++)
+				if (done)
+					break;
+
+			}
+#if 0
 			for (int i = 0; i < thisElem0->getFacesNumber(); i++)
 			{
 				thisElem = thisElem0->getNeighbor(i);
+				if (!thisElem)
+					continue;
 				// look for adjacent solid elements
 				if (thisElem->getElementType() == Mesh_Group::line)
 					continue;
@@ -682,6 +738,7 @@ void Mesh::GenerateHighOrderNodes()
 				if (done)
 					break;
 			}
+#endif
 			if (!done)
 			{
 				aNode = new Node((long) node_vector.size());
