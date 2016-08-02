@@ -12,17 +12,17 @@ IF(USE_METIS_SOURCE)
 	)
 	ADD_LIBRARY(METIS_lib STATIC ${METIS_SOURCES} )
 
-	ADD_EXECUTABLE(${PROJECT_NAME} partition.cpp)
+	ADD_EXECUTABLE(partmesh-egs partition.cpp)
 
-	target_link_libraries(${PROJECT_NAME} 
+	target_link_libraries(partmesh-egs
 	   Math
 	   Mesh		
 	   METIS_lib
        metis
 	)
 ELSE() 
-	ADD_EXECUTABLE(${PROJECT_NAME} partition.cpp)
-	target_link_libraries(${PROJECT_NAME} 
+        ADD_EXECUTABLE(partmesh-egs partition.cpp)
+	target_link_libraries(partmesh-egs
 		Math
 		Mesh
 	)	
