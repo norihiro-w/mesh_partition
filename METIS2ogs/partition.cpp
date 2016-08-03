@@ -308,8 +308,10 @@ int main(int argc, char* argv[])
          {
              string vtk_name = fname+".vtk";
              ofstream of_vtk(vtk_name.c_str());
-             a_mesh->WriteVTK_Vertex(of_vtk);
-             of_vtk.close();
+			 //a_mesh->WriteVTK_Vertex(of_vtk);
+			 a_mesh->WriteVTK_Nodes(of_vtk);
+			 a_mesh->WriteVTK_Elements(of_vtk);
+			 of_vtk.close();
          }
 
          break;

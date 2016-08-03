@@ -1693,6 +1693,78 @@ void Mesh::WriteVTK_Elements_of_Subdomain(std::ostream& os, std::vector<Elem*>& 
 
 }
 
+void Mesh::WriteVTK_Elements(std::ostream& os)
+{
+	size_t ne0 = elem_vector.size();
+	size_t size = ne0;
+
+	const string deli = " ";
+
+	for (auto a_elem : elem_vector)
+	{
+		auto nne = a_elem->getNodesNumber(useQuadratic);
+		if (useQuadratic && a_elem->ele_Type == quadri)
+			nne -= 1;
+
+		size += nne;
+	}
+
+	os << "\nCELLS " << ne0 << deli << size << endl;
+
+	// CELLs
+	for (auto a_elem : elem_vector)
+	{
+
+		auto nne = a_elem->getNodesNumber(useQuadratic);
+		if (useQuadratic && a_elem->ele_Type == quadri)
+			nne -= 1;
+
+		os << nne << deli;
+
+		if (useQuadratic && a_elem->ele_Type == tet) // Tet
+		{
+			for (int k = 0; k < 7; k++)
+				os << a_elem->nodes[k]->getIndex() << deli;
+
+			for (int k = 0; k < 3; k++)
+			{
+				int j = 7 + k;
+				//int j = (k + 2) % 3 + 7;
+				//
+
+				os << a_elem->nodes[j]->getIndex() << deli;
+			}
+		}
+		else
+		{
+			for (int k = 0; k < nne; k++)
+				os << a_elem->nodes[k]->getIndex() << deli;
+		}
+
+		os << endl;
+	}
+	os << endl;
+
+	// CELL types
+	os << "CELL_TYPES " << ne0 << endl;
+	for (auto a_elem : elem_vector)
+		a_elem->WriteVTK_Type(os, useQuadratic);
+
+	os << endl;
+
+//	// Partition
+//	os << "CELL_DATA " << ne0 << endl;
+//	os << "SCALARS Partition int 1\nLOOKUP_TABLE default" << endl;
+//	for (size_t i = 0; i < ne0; i++)
+//		os << sbd_index << endl;
+
+	os << "CELL_DATA " << ne0 << endl;
+	os << "SCALARS MatID int 1\nLOOKUP_TABLE default" << endl;
+	for (auto a_elem : elem_vector)
+		os << a_elem->getPatchIndex() << endl;
+
+}
+
 void Mesh::WriteVTK_Vertex(std::ostream& os)
 {
 	//-----------------------------------------------------------
