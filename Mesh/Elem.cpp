@@ -209,7 +209,7 @@ void Elem::Init()
          nnodesHQ = 3;
          ele_dim = 1;
          nfaces = 2;
-         nedges = 0;
+		 nedges = 1;
          break;
       case quadri:
          nnodes = 4;

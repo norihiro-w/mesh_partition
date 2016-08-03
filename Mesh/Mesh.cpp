@@ -1,11 +1,12 @@
 #include "Mesh.h"
 
-#include <sstream>
+#include <algorithm>
+#include <cfloat>
+#include <cmath>
 #include <cstdlib>
 #include <iomanip>
-#include <cmath>
-#include <cfloat>
 #include <limits>
+#include <sstream>
 
 #include "Node.h"
 #include "Edge.h"
@@ -118,45 +119,34 @@ void Mesh::ConnectedNodes(bool quadratic)
  **************************************************************************/
 void Mesh::ConnectedElements2Node(bool quadratic)
 {
-	long i, j, e, ni;
-	Elem* thisElem0 = NULL;
-	Node * node = NULL;
-	bool done = false;
+	for (auto node :  node_vector)
+		node->ElementsRelated.clear();
 	// set neighbors of node
-	for (e = 0; e < (long) node_vector.size(); e++)
-		node_vector[e]->ElementsRelated.clear();
-	for (e = 0; e < (long) elem_vector.size(); e++)
+	for (long e = 0; e < (long) elem_vector.size(); e++)
 	{
-		thisElem0 = elem_vector[e];
+		auto thisElem0 = elem_vector[e];
 		if (!thisElem0->getStatus())
 			continue;      // Not marked for use
-		for (i = 0; i < thisElem0->getNodesNumber(quadratic); i++)
+		for (int i = 0; i < thisElem0->getNodesNumber(quadratic); i++)
 		{
-			done = false;
-			ni = thisElem0->getNodeIndex(i);
-			node = node_vector[ni];
-			for (j = 0; j < (int) node->ElementsRelated.size(); j++)
+			bool found = false;
+			auto node = node_vector[thisElem0->getNodeIndex(i)];
+			for (int j = 0; j < (int) node->ElementsRelated.size(); j++)
 			{
 				if (e == node->ElementsRelated[j])
 				{
-					done = true;
+					found = true;
 					break;
 				}
 			}
-			if (!done)
+			if (!found)
 				node->ElementsRelated.push_back(e);
 		}
 	}
 }
+
 void Mesh::ConstructGrid()
 {
-	int counter;
-	int i, j, k, ii, jj, m0, m, n0, n;
-	int nnodes0;
-	long e, ei, ee, e_size, e_size_l;
-	bool done;
-	double x_sum, y_sum, z_sum;
-
 	int faceIndex_loc0[10];
 	int faceIndex_loc[10];
 	vec<Node*> e_nodes0(20);
@@ -164,7 +154,6 @@ void Mesh::ConstructGrid()
 	long node_index_glb0[20];
 
 #ifdef BUILD_MESH_EDGE
-	int nedges0, nedges;
 	int edgeIndex_loc0[3];
 	int edgeIndex_loc[3];
 	vec<int> Edge_Orientation(15);
@@ -177,15 +166,12 @@ void Mesh::ConstructGrid()
 
 	vec<Node*> e_edgeNodes0(3);
 	vec<Node*> e_edgeNodes(3);
-	Elem* thisElem0 = NULL;
-	Elem* thisElem = NULL;
 
 	clock_t start, finish;
 	start = clock();
 
 	//Elem->nodes not initialized
 
-	e_size = (long) elem_vector.size();
 	if (NodesNumber_Linear == 0)
 		NodesNumber_Linear = (long) node_vector.size();
 
@@ -196,45 +182,53 @@ void Mesh::ConstructGrid()
 
 	//----------------------------------------------------------------------
 	// Compute neighbors and edges
-	for (e = 0; e < e_size; e++)
+	auto const n_elements = (long) elem_vector.size();
+	for (long e0_id = 0; e0_id < n_elements; e0_id++)
 	{
-		thisElem0 = elem_vector[e];
+		auto thisElem0 = elem_vector[e0_id];
 		thisElem0->setOrder(useQuadratic);
-		nnodes0 = thisElem0->getNodesNumber(useQuadratic);
+		// get nodes
+		const int nnodes0 = thisElem0->getNodesNumber(useQuadratic);
 		thisElem0->getNodeIndeces(node_index_glb0);
-		thisElem0->getNeighbors(Neighbors0);
-		for (i = 0; i < nnodes0; i++) // Nodes
+		for (int i = 0; i < nnodes0; i++)
 			e_nodes0[i] = node_vector[node_index_glb0[i]];
-		m0 = thisElem0->getFacesNumber();
-		// neighbors
-		for (i = 0; i < m0; i++) // Faces
+		// get neighbors
+		thisElem0->getNeighbors(Neighbors0);
+		const int nElem0Faces = thisElem0->getFacesNumber();
+		// set neighbors
+		for (int i = 0; i < nElem0Faces; i++)
 		{
 			if (Neighbors0[i])
 				continue;
-			n0 = thisElem0->getElementFaceNodes(i, faceIndex_loc0);
-			done = false;
-			for (k = 0; k < n0; k++)
-			{
-				e_size_l = (long) e_nodes0[faceIndex_loc0[k]]->ElementsRelated.size();
-				for (ei = 0; ei < e_size_l; ei++)
-				{
-					ee = e_nodes0[faceIndex_loc0[k]]->ElementsRelated[ei];
-					if (ee == e)
-						continue;
-					thisElem = elem_vector[ee];
-					thisElem->getNodeIndeces(node_index_glb);
-					thisElem->getNeighbors(Neighbors);
-					m = thisElem->getFacesNumber();
 
-					for (ii = 0; ii < m; ii++) // Faces
+			// look for an element sharing the same face
+			bool foundNeighbor = false;
+			const int nElem0FaceNodes = thisElem0->getElementFaceNodes(i, faceIndex_loc0);
+			for (int k = 0; k < nElem0FaceNodes; k++)
+			{
+				Mesh_Group::Node* face_node = e_nodes0[faceIndex_loc0[k]];
+				const long n_elems_connected_to_face_node = (long) face_node->ElementsRelated.size();
+				for (long ei = 0; ei < n_elems_connected_to_face_node; ei++)
+				{
+					const long conn_ele_id = face_node->ElementsRelated[ei];
+					if (conn_ele_id == e0_id)
+						continue; //skip same element
+
+					Mesh_Group::Elem* connectedElem = elem_vector[conn_ele_id];
+					connectedElem->getNodeIndeces(node_index_glb);
+					connectedElem->getNeighbors(Neighbors);
+					const int nConnElemFaces = connectedElem->getFacesNumber();
+
+					for (int ii = 0; ii < nConnElemFaces; ii++) // Faces of the connected element
 					{
-						n = thisElem->getElementFaceNodes(ii, faceIndex_loc);
-						if (n0 != n)
+						const int nConnElemFaceNodes = connectedElem->getElementFaceNodes(ii, faceIndex_loc);
+						// check if this face is shared
+						if (nElem0FaceNodes != nConnElemFaceNodes)
 							continue;
-						counter = 0;
-						for (j = 0; j < n0; j++)
+						int counter = 0;
+						for (int j = 0; j < nElem0FaceNodes; j++)
 						{
-							for (jj = 0; jj < n; jj++)
+							for (int jj = 0; jj < nConnElemFaceNodes; jj++)
 							{
 								if (node_index_glb0[faceIndex_loc0[j]] == node_index_glb[faceIndex_loc[jj]])
 								{
@@ -243,19 +237,18 @@ void Mesh::ConstructGrid()
 								}
 							}
 						}
-						if (counter == n)
-						{
-							Neighbors0[i] = thisElem;
-							Neighbors[ii] = thisElem0;
-							thisElem->setNeighbor(ii, thisElem0);
-							done = true;
-							break;
-						}
+						if (counter != nConnElemFaceNodes)
+							continue;
+						// found neighbor for this face
+						Neighbors0[i] = connectedElem;
+						Neighbors[ii] = thisElem0;
+						connectedElem->setNeighbor(ii, thisElem0);
+						foundNeighbor = true;
 					}
-					if (done)
+					if (foundNeighbor)
 						break;
 				}
-				if (done)
+				if (foundNeighbor)
 					break;
 			}
 		}
@@ -264,28 +257,29 @@ void Mesh::ConstructGrid()
 #ifdef BUILD_MESH_EDGE
 		// --------------------------------
 		// Edges
-		nedges0 = thisElem0->getEdgesNumber();
+		const int nedges0 = thisElem0->getEdgesNumber();
 		thisElem0->getEdges(Edges0);
-		for(i=0; i<nedges0; i++)
+		for(int i=0; i<nedges0; i++)
 		{
 			thisElem0->getLocalIndices_EdgeNodes(i, edgeIndex_loc0);
 			// Check neighbors
-			done = false;
-			for(k=0; k<2; k++)
+			bool done = false;
+			for(int k=0; k<2; k++)
 			{
-				e_size_l = (long)e_nodes0[edgeIndex_loc0[k]]->ElementsRelated.size();
-				for(ei=0; ei<e_size_l; ei++)
+				auto edge_node = e_nodes0[edgeIndex_loc0[k]];
+				const long nConnElements = (long)edge_node->ElementsRelated.size();
+				for(long ei=0; ei<nConnElements; ei++)
 				{
-					ee = e_nodes0[edgeIndex_loc0[k]]->ElementsRelated[ei];
-					if(ee==e) continue;
-					thisElem = elem_vector[ee];
-					thisElem->getNodeIndeces(node_index_glb);
-					nedges = thisElem->getEdgesNumber();
-					thisElem->getEdges(Edges);
+					auto const connected_element_id = edge_node->ElementsRelated[ei];
+					if(connected_element_id == e0_id) continue;
+					auto connected_element = elem_vector[connected_element_id];
+					connected_element->getNodeIndeces(node_index_glb);
+					connected_element->getEdges(Edges);
 					// Edges of neighbors
-					for(ii=0; ii<nedges; ii++)
+					auto const nConnEleEdges = connected_element->getEdgesNumber();
+					for(int ii=0; ii<nConnEleEdges; ii++)
 					{
-						thisElem->getLocalIndices_EdgeNodes(ii, edgeIndex_loc);
+						connected_element->getLocalIndices_EdgeNodes(ii, edgeIndex_loc);
 						if(( node_index_glb0[edgeIndex_loc0[0]]==node_index_glb[edgeIndex_loc[0]]
 										&&node_index_glb0[edgeIndex_loc0[1]]==node_index_glb[edgeIndex_loc[1]])
 								||( node_index_glb0[edgeIndex_loc0[0]]==node_index_glb[edgeIndex_loc[1]]
@@ -330,7 +324,7 @@ void Mesh::ConstructGrid()
 		thisElem0->setNodes(e_nodes0, true);
 	}      // Over elements
 
-		   // set faces on surfaces and others
+	// set faces on surfaces and others
 	msh_no_line = 0;  // Should be members of mesh
 	msh_no_quad = 0;
 	msh_no_hexs = 0;
@@ -338,9 +332,8 @@ void Mesh::ConstructGrid()
 	msh_no_tets = 0;
 	msh_no_pris = 0;
 	msh_no_pyra = 0;
-	for (e = 0; e < e_size; e++)
+	for (auto thisElem0 : elem_vector)
 	{
-		thisElem0 = elem_vector[e];
 		switch (thisElem0->getElementType())
 		{
 		case line:
@@ -372,7 +365,7 @@ void Mesh::ConstructGrid()
 			continue; // line element
 		thisElem0->getNodeIndeces(node_index_glb0);
 		thisElem0->getNeighbors(Neighbors0);
-		m0 = thisElem0->getFacesNumber();
+		auto const nElem0Faces = thisElem0->getFacesNumber();
 
 #ifdef BUILD_MESH_FACE
 		// Check face on surface
@@ -401,14 +394,14 @@ void Mesh::ConstructGrid()
 	// Node information
 	// 1. Default node index <---> eqs index relationship
 	// 2. Coordiate system flag
-	x_sum = 0.0;
-	y_sum = 0.0;
-	z_sum = 0.0;
-	for (e = 0; e < (long) node_vector.size(); e++)
+	double x_sum = 0.0;
+	double y_sum = 0.0;
+	double z_sum = 0.0;
+	for (long e0_id = 0; e0_id < (long) node_vector.size(); e0_id++)
 	{
-		x_sum += fabs(node_vector[e]->X());
-		y_sum += fabs(node_vector[e]->Y());
-		z_sum += fabs(node_vector[e]->Z());
+		x_sum += fabs(node_vector[e0_id]->X());
+		y_sum += fabs(node_vector[e0_id]->Y());
+		z_sum += fabs(node_vector[e0_id]->Z());
 	}
 	if (x_sum > 0.0 && y_sum < DBL_MIN && z_sum < DBL_MIN)
 		coordinate_system = 10;
@@ -460,24 +453,19 @@ void Mesh::ConstructGrid()
  **************************************************************************/
 void Mesh::GenerateHighOrderNodes()
 {
-	int i, k, ii;
-	int nnodes0, nedges0, nedges;
-	long e, ei, ee, e_size, e_size_l;
 	int edgeIndex_loc0[3];
 	int edgeIndex_loc1[3];
-	bool done;
-	double x0, y0, z0;
 
 
 	// Set neighbors of node. All elements, even in deactivated subdomains, are taken into account here.
-	for (e = 0; e < (long) node_vector.size(); e++)
+	for (long e = 0; e < (long) node_vector.size(); e++)
 		node_vector[e]->getConnectedElementIDs().clear();
-	done = false;
+	bool done = false;
 	const long ele_vector_size(elem_vector.size());
-	for (e = 0; e < ele_vector_size; e++)
+	for (long e = 0; e < ele_vector_size; e++)
 	{
 		Elem* thisElem0 = elem_vector[e];
-		for (i = 0; i < thisElem0->getNodesNumber(false); i++)
+		for (int i = 0; i < thisElem0->getNodesNumber(false); i++)
 		{
 			done = false;
 			long ni = thisElem0->getNodeIndex(i);
@@ -497,61 +485,54 @@ void Mesh::GenerateHighOrderNodes()
 	start = clock();
 
 	//
-	Node *aNode = NULL;
 	vec<Node*> e_nodes0(20);
 	vec<Node*> e_nodes(20);
-	Elem *thisElem0 = NULL;
-	Elem *thisElem = NULL;
-#ifdef BUILD_MESH_EDGE
-	Edge *thisEdge0=NULL;
-	Edge *thisEdge=NULL;
-#endif
 	//----------------------------------------------------------------------
 	NodesNumber_Linear = (long) node_vector.size();
 	// Loop over elements
-	e_size = (long) elem_vector.size();
+	const auto e_size = (long) elem_vector.size();
 	bool hasLines = false;
-	for (e = 0; e < e_size; e++)
+	for (long e = 0; e < e_size; e++)
 	{
-		thisElem0 = elem_vector[e];
+		auto thisElem0 = elem_vector[e];
 		if (thisElem0->getElementType() == Mesh_Group::line) {
 			hasLines = true;
 			continue;
 		}
-		nnodes0 = thisElem0->nnodes; // Number of nodes for linear element
+		auto nnodes0 = thisElem0->nnodes; // Number of nodes for linear element
 		//thisElem0->GetNodeIndeces(node_index_glb0);
-		for (i = 0; i < nnodes0; i++) // Nodes
+		for (int i = 0; i < nnodes0; i++) // Nodes
 			e_nodes0[i] = thisElem0->getNode(i);
 		// --------------------------------
 		// Edges
-		nedges0 = thisElem0->getEdgesNumber();
+		auto nedges0 = thisElem0->getEdgesNumber();
 		// Check if there is any neighbor that has new middle points
-		for (i = 0; i < nedges0; i++)
+		for (int i = 0; i < nedges0; i++)
 		{
 #ifdef BUILD_MESH_EDGE
-			thisEdge0 = thisElem0->getEdge(i);
+			auto thisEdge0 = thisElem0->getEdge(i);
 #endif
 			thisElem0->getLocalIndices_EdgeNodes(i, edgeIndex_loc0);
 			const long ena0 = thisElem0->getNodeIndex(edgeIndex_loc0[0]);
 			const long ena1 = thisElem0->getNodeIndex(edgeIndex_loc0[1]);
 			// Check neighbors
-			done = false;
-			for (k = 0; k < 2; k++)
+			bool done = false;
+			for (int k = 0; k < 2; k++)
 			{
-				e_size_l = (long) e_nodes0[edgeIndex_loc0[k]]->ElementsRelated.size();
-				for (ei = 0; ei < e_size_l; ei++)
+				auto const nEdgeConnectedElements = (long) e_nodes0[edgeIndex_loc0[k]]->ElementsRelated.size();
+				for (int ei = 0; ei < nEdgeConnectedElements; ei++)
 				{
-					ee = e_nodes0[edgeIndex_loc0[k]]->ElementsRelated[ei];
+					auto ee = e_nodes0[edgeIndex_loc0[k]]->ElementsRelated[ei];
 					if (ee == e)
 						continue;
-					thisElem = elem_vector[ee];
-					nedges = thisElem->getEdgesNumber();
+					auto thisElem = elem_vector[ee];
+					auto nedges = thisElem->getEdgesNumber();
 
 					// If this element already proccessed
 					if (thisElem->nodes.Size() == thisElem->getNodesNumberHQ())
 					{
 						// Edges of neighbors
-						for (ii = 0; ii < nedges; ii++)
+						for (int ii = 0; ii < nedges; ii++)
 						{
 							thisElem->getLocalIndices_EdgeNodes(ii, edgeIndex_loc1);
 
@@ -560,7 +541,7 @@ void Mesh::GenerateHighOrderNodes()
 
 							if (((ena0 == enb0) && (ena1 == enb1)) || ((ena0 == enb1) && (ena1 == enb0)))
 							{
-								aNode = thisElem->getNode(edgeIndex_loc1[2]);
+								auto aNode = thisElem->getNode(edgeIndex_loc1[2]);
 								e_nodes0[edgeIndex_loc0[2]] = aNode;
 								done = true;
 								break;
@@ -578,7 +559,7 @@ void Mesh::GenerateHighOrderNodes()
 			} //for(k=0;k<2;k++)
 			if (!done)
 			{
-				aNode = new Node((long) node_vector.size());
+				auto aNode = new Node((long) node_vector.size());
 				const Node *na = thisElem0->getNode(edgeIndex_loc0[0]);
 				const Node *nb = thisElem0->getNode(edgeIndex_loc0[1]);
 				aNode->setX(0.5 * (na->X() + nb->X()));
@@ -597,11 +578,11 @@ void Mesh::GenerateHighOrderNodes()
 		//
 		if (thisElem0->getElementType() == quadri) // Quadrilateral
 		{
-			x0 = y0 = z0 = 0.0;
-			aNode = new Node((long) node_vector.size());
+			double x0 = 0.0, y0 = 0.0, z0 = 0.0;
+			auto aNode = new Node((long) node_vector.size());
 			e_nodes0[8] = aNode;
 			nnodes0 = thisElem0->nnodes;
-			for (i = 0; i < nnodes0; i++) // Nodes
+			for (int i = 0; i < nnodes0; i++) // Nodes
 			{
 				x0 += e_nodes0[i]->X();
 				y0 += e_nodes0[i]->Y();
@@ -625,66 +606,72 @@ void Mesh::GenerateHighOrderNodes()
 	// Setup 1d line elements at the end
 	if (hasLines)
 	{
-		for (e = 0; e < e_size; e++)
+		for (long e = 0; e < e_size; e++)
 		{
-			thisElem0 = elem_vector[e];
-			if (thisElem0->getElementType() != Mesh_Group::line)
+			if (elem_vector[e]->getElementType() != Mesh_Group::line)
 				continue;
+			auto thisEdge0 = elem_vector[e];
 
-			nnodes0 = thisElem0->nnodes;
+			const auto nnodes0 = thisEdge0->nnodes;
 			for (int i = 0; i < nnodes0; i++)
-				e_nodes0[i] = thisElem0->getNode(i);
+				e_nodes0[i] = thisEdge0->getNode(i);
 
-			done = false;
+			std::vector<int> elementIDs_connected_to_edge_nodes;
+			for (int i=0; i<nnodes0; i++)
+				for (auto eid : node_vector[thisEdge0->getNodesNumber(i)]->ElementsRelated)
+					elementIDs_connected_to_edge_nodes.push_back(eid);
+			std::sort(elementIDs_connected_to_edge_nodes.begin(), elementIDs_connected_to_edge_nodes.end());
+			elementIDs_connected_to_edge_nodes.erase(std::unique(elementIDs_connected_to_edge_nodes.begin(), elementIDs_connected_to_edge_nodes.end()), elementIDs_connected_to_edge_nodes.end());
 
-			for (int i = 0; i < thisElem0->getFacesNumber(); i++)
+			bool foundCommonEdge = false;
+			for (auto ele_id : elementIDs_connected_to_edge_nodes)
 			{
-				thisElem = thisElem0->getNeighbor(i);
-				// look for adjacent solid elements
-				if (thisElem->getElementType() == Mesh_Group::line)
+				auto connElem = elem_vector[ele_id];
+				if (connElem->getElementType() == Mesh_Group::line)
 					continue;
 
-				for (int j = 0; j < thisElem->nnodes; j++)
-					e_nodes[j] = thisElem->getNode(j);
-				nedges = thisElem->getEdgesNumber();
-				// search a edge connecting to this line element
-				for (int j = 0; j < nedges; j++)
+				// check if it has a common edge
+				for (int i_edge=0; i_edge<connElem->getEdgesNumber(); i_edge++)
 				{
-					thisEdge = thisElem->getEdge(j);
-					thisElem->getLocalIndices_EdgeNodes(j, edgeIndex_loc0);
-					// Check neighbors
-					for (k = 0; k < 2; k++)
+					auto thisEdge = connElem->getEdge(i_edge);
+					for (int i = 0; i < 2; i++)
+						e_nodes[i] = thisEdge->getNode(i);
+					bool foundEdge = true;
+					for (int i=0; i<2; i++)
 					{
-						e_size_l = (long) e_nodes[edgeIndex_loc0[k]]->getConnectedElementIDs().size();
-						for (ei = 0; ei < e_size_l; ei++)
+						bool foundNode = false;
+						for (int j=0; j<2; j++)
 						{
-							ee = e_nodes[edgeIndex_loc0[k]]->getConnectedElementIDs()[ei];
-							if (elem_vector[ee] != thisElem0)
-								continue;
-							//the edge is found now
-							aNode = thisEdge->getNode(2);
-							if (aNode) // The middle point exist
+							if (e_nodes[j]==e_nodes0[i])
 							{
-								e_nodes0[nnodes0] = aNode;
-								nnodes0++;
-								done = true;
+								foundNode = true;
 								break;
 							}
-							if (done)
-								break;
-						} // for(ei=0; ei<e_size_l; ei++)
-						if (done)
+						}
+						if (!foundNode) {
+							foundEdge = false;
 							break;
-					} //for(k=0;k<2;k++)
-					if (done)
+						}
+					}
+					if (!foundEdge)
+						continue;
+					//the edge is found now
+					auto aNode = thisEdge->getNode(2);
+					if (aNode) // The middle point exist
+					{
+						e_nodes0[nnodes0] = aNode;
+						foundCommonEdge = true;
 						break;
-				} //  for(i=0; i<nedges0; i++)
-				if (done)
+					}
+				}
+				if (foundCommonEdge)
 					break;
 			}
-			if (!done)
+
+			if (!foundCommonEdge)
 			{
-				aNode = new Node((long) node_vector.size());
+				auto aNode = new Node((long) node_vector.size());
+				double x0 = 0.0, y0 = 0.0, z0 = 0.0;
 				for (int i = 0; i < nnodes0; i++) // Nodes
 				{
 					x0 += e_nodes0[i]->X();
@@ -698,23 +685,22 @@ void Mesh::GenerateHighOrderNodes()
 				aNode->setY(y0);
 				aNode->setZ(z0);
 				e_nodes0[nnodes0] = aNode;
-				nnodes0++;
 				node_vector.push_back(aNode);
 			}
-			thisElem0->setOrder(true);
-			thisElem0->setNodes(e_nodes0, true);
+			thisEdge0->setOrder(true);
+			thisEdge0->setNodes(e_nodes0, true);
 		}
 	}
 
 	NodesNumber_Quadratic = (long) node_vector.size();
-	for (e = 0; e < e_size; e++)
+	for (long e = 0; e < e_size; e++)
 	{
-		thisElem0 = elem_vector[e];
-		for (i = thisElem0->nnodes; i < thisElem0->nnodesHQ; i++)
+		auto thisElem0 = elem_vector[e];
+		for (int i = thisElem0->nnodes; i < thisElem0->nnodesHQ; i++)
 		{
-			done = false;
-			aNode = thisElem0->getNode(i);
-			for (k = 0; k < (int) aNode->ElementsRelated.size(); k++)
+			bool done = false;
+			auto aNode = thisElem0->getNode(i);
+			for (int k = 0; k < (int) aNode->ElementsRelated.size(); k++)
 			{
 				if (e == aNode->ElementsRelated[k])
 				{
@@ -1641,6 +1627,78 @@ void Mesh::WriteVTK_Elements_of_Subdomain(std::ostream& os, std::vector<Elem*>& 
 	os << "SCALARS Partition int 1\nLOOKUP_TABLE default" << endl;
 	for (i = 0; i < ne0; i++)
 		os << sbd_index << endl;
+
+}
+
+void Mesh::WriteVTK_Elements(std::ostream& os)
+{
+	size_t ne0 = elem_vector.size();
+	size_t size = ne0;
+
+	const string deli = " ";
+
+	for (auto a_elem : elem_vector)
+	{
+		auto nne = a_elem->getNodesNumber(useQuadratic);
+		if (useQuadratic && a_elem->ele_Type == quadri)
+			nne -= 1;
+
+		size += nne;
+	}
+
+	os << "\nCELLS " << ne0 << deli << size << endl;
+
+	// CELLs
+	for (auto a_elem : elem_vector)
+	{
+
+		auto nne = a_elem->getNodesNumber(useQuadratic);
+		if (useQuadratic && a_elem->ele_Type == quadri)
+			nne -= 1;
+
+		os << nne << deli;
+
+		if (useQuadratic && a_elem->ele_Type == tet) // Tet
+		{
+			for (int k = 0; k < 7; k++)
+				os << a_elem->nodes[k]->getIndex() << deli;
+
+			for (int k = 0; k < 3; k++)
+			{
+				int j = 7 + k;
+				//int j = (k + 2) % 3 + 7;
+				//
+
+				os << a_elem->nodes[j]->getIndex() << deli;
+			}
+		}
+		else
+		{
+			for (int k = 0; k < nne; k++)
+				os << a_elem->nodes[k]->getIndex() << deli;
+		}
+
+		os << endl;
+	}
+	os << endl;
+
+	// CELL types
+	os << "CELL_TYPES " << ne0 << endl;
+	for (auto a_elem : elem_vector)
+		a_elem->WriteVTK_Type(os, useQuadratic);
+
+	os << endl;
+
+//	// Partition
+//	os << "CELL_DATA " << ne0 << endl;
+//	os << "SCALARS Partition int 1\nLOOKUP_TABLE default" << endl;
+//	for (size_t i = 0; i < ne0; i++)
+//		os << sbd_index << endl;
+
+	os << "CELL_DATA " << ne0 << endl;
+	os << "SCALARS MatID int 1\nLOOKUP_TABLE default" << endl;
+	for (auto a_elem : elem_vector)
+		os << a_elem->getPatchIndex() << endl;
 
 }
 

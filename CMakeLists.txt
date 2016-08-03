@@ -14,9 +14,9 @@ SET (VERSION_MAJOR 2)
 SET (VERSION_MINOR 0)
 SET (VERSION_PATCH 0)
 
-  if(COMMAND cmake_policy)
-      cmake_policy(SET CMP0003 NEW)
-    endif(COMMAND cmake_policy)
+if(COMMAND cmake_policy)
+    cmake_policy(SET CMP0003 NEW)
+endif(COMMAND cmake_policy)
 
 IF (WIN32)
 	SET ( CMAKE_CONFIGURATION_TYPES "Release;Debug" CACHE TYPE INTERNAL FORCE )
@@ -57,8 +57,8 @@ ENDIF (MSVC)
 
 ### For GNU C/CXX.
 IF(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_COMPILER_IS_GNUCC)
-	SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ansi -Wall -Wextra")
-        ADD_DEFINITIONS(
+    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11  -Wall -Wextra")
+    ADD_DEFINITIONS(
 #		-pedantic
 		-fno-nonansi-builtins
 	)
