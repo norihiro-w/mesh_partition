@@ -49,9 +49,12 @@ void Node::Write(ostream& os) const
       <<Coordinate[2]<<endl;
 }
 
-void Node::WriteWithEqsID(ostream& os) const
+void Node::WriteWithEqsID(ostream& os, bool quadratic) const
 {
-   os << setw(14) << original_index << " " << index <<" ";
+   os << setw(14) << original_index << " " << subdom_id <<" ";
+   os << eqs_index <<" ";
+   if (quadratic)
+	   os << eqs_index_Q << " ";
    os << Coordinate[0] <<" "
       << Coordinate[1] <<" "
       << Coordinate[2] <<"\n";

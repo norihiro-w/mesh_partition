@@ -80,7 +80,7 @@ class Node:public Grain
 
       // Output
       void Write(std::ostream& os = std::cout) const;
-	  void WriteWithEqsID(std::ostream& os = std::cout) const;
+	  void WriteWithEqsID(std::ostream& os, bool quadratic) const;
       void WriteCoordinates(std::ostream& os = std::cout) const;
 
       std::vector<long> const& getConnectedElementIDs() const { return ElementsRelated; }
@@ -88,8 +88,11 @@ class Node:public Grain
 
    private:
 	  double Coordinate[3] = {};
-	  long original_index = 0;
+	  long original_index = -1;
       long local_index; // For domain decomposition
+	  long eqs_index = -1;
+	  long eqs_index_Q = -1;
+	  int subdom_id = -1;
       bool _is_quadratic;
       std::vector<long>  ElementsRelated;
       std::vector<long>  NodesRelated;

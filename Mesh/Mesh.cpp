@@ -1392,6 +1392,7 @@ void Mesh::ConstructSubDomain_by_Nodes(const string fname, const string fpath, c
 					internal_quad_nodes.push_back(node_vector[j]);
 				sbd_nodes.push_back(node_vector[j]);
 				internal_nodes[j]->local_index = j;
+				internal_nodes[j]->subdom_id = idom;
 			}
 			for (long j = 0; j < n_all_elements; j++)
 				subdom_internal_elements.push_back(elem_vector[j]);
@@ -1412,6 +1413,7 @@ void Mesh::ConstructSubDomain_by_Nodes(const string fname, const string fpath, c
 				Node* a_node = internal_nodes[j];
 				a_node->Marking(true);
 				a_node->local_index = j + node_id_shift; //internal node id should be continuous
+				a_node->subdom_id = idom;
 
 				if (internal_nodes[j]->isQuadratic())
 					vec_linear_nodes.push_back(internal_nodes[j]);
@@ -1444,7 +1446,9 @@ void Mesh::ConstructSubDomain_by_Nodes(const string fname, const string fpath, c
 			nmb_element_idxs_g += static_cast<long>(subdom_ghost_elements[j]->ghost_nodes.size());
 		}
 
+		//----------------------------------------------------------------------------------
 		// write into a file
+		//----------------------------------------------------------------------------------
 		string dom_str(number2str(idom));
 		const std::string deli(" ");
 		os_subd << size_sbd_nodes << deli << size_sbd_nodes - internal_quad_nodes.size() - dom_ghost_quad_nodes.size() << deli << subdom_internal_elements.size() << deli << subdom_ghost_elements.size() << deli << internal_nodes.size() - internal_quad_nodes.size() << deli << internal_nodes.size() << deli << NodesNumber_Linear << deli << NodesNumber_Quadratic << deli << nmb_element_idxs << deli << nmb_element_idxs_g << endl;
@@ -1487,16 +1491,41 @@ void Mesh::ConstructSubDomain_by_Nodes(const string fname, const string fpath, c
 		nnodes_previous_sdom = static_cast<long>(sbd_nodes.size());
 	}
 
-	// re-number global node index
-	size_t global_node_id = 0;
+	//----------------------------------------------------------------------------------
+	// re-number eqs index for linear case
+	//----------------------------------------------------------------------------------
+	size_t eqs_index = 0;
 	for (size_t i=0; i<vec_linear_nodes.size(); i++) {
-		vec_linear_nodes[i]->index = global_node_id++;
+		vec_linear_nodes[i]->eqs_index = eqs_index++;
 	}
 	for (size_t i=0; i<vec_quad_nodes.size(); i++) {
-		vec_quad_nodes[i]->index = global_node_id++;
+		vec_quad_nodes[i]->eqs_index = eqs_index++;
+	}
+	if (is_quad)
+	{
+		// re-number eqs index for quadatic case
+		size_t eqs_index_Q = 0;
+		for (int idom = 0; idom < num_parts; idom++)
+		{
+			const long start = nnodes_sdom_start[idom];
+			long end = 0;
+			if (idom < num_parts - 1)
+				end = nnodes_sdom_start[idom + 1];
+			else
+				end = static_cast<long>(sbd_nodes.size());
+
+			for (long i = start; i < end; i++)
+			{
+				Node* a_node = sbd_nodes[i];
+				if (a_node->subdom_id == idom)
+					a_node->eqs_index_Q = eqs_index_Q++;
+			}
+		}
 	}
 
+	//----------------------------------------------------------------------------------
 	// Rewrite nodes with new node index
+	//----------------------------------------------------------------------------------
 	long end = 0;
 	for (int idom = 0; idom < num_parts; idom++)
 	{
@@ -1510,7 +1539,7 @@ void Mesh::ConstructSubDomain_by_Nodes(const string fname, const string fpath, c
 		for (long i = start; i < end; i++)
 		{
 			Node* a_node = sbd_nodes[i];
-			a_node->WriteWithEqsID(os_subd);
+			a_node->WriteWithEqsID(os_subd, is_quad);
 			//a_node->Write(os_subd);
 		}
 	}
