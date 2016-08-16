@@ -22,7 +22,7 @@ class Elem;
 class Mesh
 {
 public:
-	Mesh(bool quad = false);
+	explicit Mesh(bool quad = false);
 	~Mesh();
 
 	void ReadGrid(std::istream& is = std::cin);

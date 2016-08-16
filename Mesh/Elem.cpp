@@ -4,7 +4,6 @@
 
 #include "Node.h"
 #include "Edge.h"
-#include "Mesh.h"
 
 //------------------------------------------------------
 //   Topology definition of geometrical element.
@@ -293,7 +292,7 @@ long Elem::getLocalNodeIndex(const int li) const
 }
 
 //    WW. 06.2005
-void Elem::Read(istream& is,  Mesh_Group::Mesh *mesh, int fileType)
+void Elem::Read(istream& is,  std::vector<Node*> &node_vector, int fileType)
 {
    //fileType=0: msh
    //fileType=1: rfi
@@ -404,35 +403,35 @@ void Elem::Read(istream& is,  Mesh_Group::Mesh *mesh, int fileType)
       case 0: // msh
          for(int i=0; i<nnodes; i++)
          {   is >> nidx;		  
-             nodes[i] = mesh->node_vector[nidx];
+             nodes[i] = node_vector[nidx];
          }
          break;
          //....................................................................
       case 1: // rfi
          for(int i=0; i<nnodes; i++)
          {   is >> nidx;		  
-             nodes[i] = mesh->node_vector[nidx];
+             nodes[i] = node_vector[nidx];
          }
          break;
          //....................................................................
       case 2: // gmsh
          for(int i=0; i<nnodes; i++)
          {   is >> nidx;		  
-             nodes[i] = mesh->node_vector[nidx-1];
+             nodes[i] = node_vector[nidx-1];
          }
          break;
          //....................................................................
       case 3: // GMS
          for(int i=0; i<nnodes; i++)
          {   is >> nidx;		  
-             nodes[i] = mesh->node_vector[nidx-1];
+             nodes[i] = node_vector[nidx-1];
          }
          break;
          //....................................................................
       case 4: // SOL
          for(int i=0; i<nnodes; i++)
          {   is >> nidx;		  
-             nodes[i] = mesh->node_vector[nidx-1];
+             nodes[i] = node_vector[nidx-1];
          }
          is >> PatchIndex;
          break;

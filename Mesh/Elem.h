@@ -19,7 +19,7 @@ namespace Mesh_Group
 {
 class Node;
 class Edge;
-class Mesh;
+
 enum ElemType {line, quadri, hex, tri, tet, prism, pyramid}; 
 
 
@@ -170,7 +170,7 @@ class Elem:public Grain
       }
 
       // Output
-	  void Read(std::istream& is, Mesh_Group::Mesh *mesh, int fileType);
+	  void Read(std::istream& is, std::vector<Node*> &node_vector, int fileType);
       void WriteIndex(std::ostream& os = std::cout) const;
       void WriteGmsh(std::ostream& os, const int sdom_idx = 0) const;
       void WriteGSmsh(std::ostream& os, bool quad = false) const;

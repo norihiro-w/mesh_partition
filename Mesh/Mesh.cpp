@@ -15,13 +15,47 @@
 
 //#define BUILD_MESH_EDGE
 
+using namespace std;
+
+namespace
+{
+
+template<typename T> std::string number2str(T d)
+{
+	std::stringstream out;
+	out << d;
+	return out.str();
+}
+
+void read_npart_file(const int num_parts, const string fname, vector<long> &vec_node_dom_idx, vector<bool> &vec_node_dom_marked)
+{
+	const string s_nparts(number2str(num_parts));
+	const string f_iparts = fname + ".mesh.npart." + s_nparts;
+	ifstream npart_in(f_iparts.c_str());
+	if (!npart_in.is_open())
+	{
+		cerr << ("Error: cannot open .npart file . It may not exist !");
+		exit(1);
+	}
+	for (long i = 0; i < static_cast<long>(vec_node_dom_idx.size()); i++)
+	{
+		int dom;
+		npart_in >> dom >> ws;
+		vec_node_dom_idx[i] = dom;
+		vec_node_dom_marked[i] = false;
+	}
+	npart_in.close();
+}
+
+} // namespace
+
+
 //------------------------------------------------------
 //   Topology definition of geometrical element.
 //    WW. 10.01.2005
 //------------------------------------------------------
 namespace Mesh_Group
 {
-using namespace std;
 
 Mesh::Mesh(bool quad)
 {
@@ -1006,32 +1040,6 @@ int Mesh::readMaterialDataFile(const std::string &fpath, const std::string &mat_
 	return num_data;
 }
 
-template<typename T> std::string number2str(T d)
-{
-	std::stringstream out;
-	out << d;
-	return out.str();
-}
-
-void read_npart_file(const int num_parts, const string fname, vector<long> &vec_node_dom_idx, vector<bool> &vec_node_dom_marked)
-{
-	const string s_nparts(number2str(num_parts));
-	const string f_iparts = fname + ".mesh.npart." + s_nparts;
-	ifstream npart_in(f_iparts.c_str());
-	if (!npart_in.is_open())
-	{
-		cerr << ("Error: cannot open .npart file . It may not exist !");
-		exit(1);
-	}
-	for (long i = 0; i < static_cast<long>(vec_node_dom_idx.size()); i++)
-	{
-		int dom;
-		npart_in >> dom >> ws;
-		vec_node_dom_idx[i] = dom;
-		vec_node_dom_marked[i] = false;
-	}
-	npart_in.close();
-}
 
 void Mesh::outputRenumedVTK(const std::string fname, const std::string s_nparts, const int num_parts, std::vector<long> &nnodes_sdom_start, long end, std::vector<Node*> &sbd_nodes, const bool is_quad, const bool osdom)
 {
@@ -1814,7 +1822,7 @@ void Mesh::ReadGrid(istream& is)
 	for (i = 0; i < ne; i++)
 	{
 		Elem* newElem = new Elem(i);
-		newElem->Read(is, this, 1);
+		newElem->Read(is, this->node_vector, 1);
 		newElem->Marking(true);
 		elem_vector.push_back(newElem);
 		counter++;
@@ -1878,7 +1886,7 @@ void Mesh::ReadGridGeoSys(istream& is)
 			for (i = 0; i < no_elements; i++)
 			{
 				newElem = new Elem(i);
-				newElem->Read(is, this, 0);
+				newElem->Read(is, this->node_vector, 0);
 				newElem->Marking(true);
 				elem_vector.push_back(newElem);
 			}
