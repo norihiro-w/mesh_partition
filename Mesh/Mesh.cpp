@@ -1456,7 +1456,7 @@ void Mesh::ConstructSubDomain_by_Nodes(const string fname, const string fpath, c
 		position_node_file[idom] = os_subd.tellp();
 		//os_subd<<"Nodes"<<endl;
 		for (long j = 0; j < size_sbd_nodes; j++)
-			sbd_nodes[j + nnodes_previous_sdom]->Write(os_subd);
+			sbd_nodes[j + nnodes_previous_sdom]->WriteWithEqsID(os_subd, is_quad);
 
 		//os_subd<<"Elements"<<endl;
 		const long nei_size = static_cast<long>(subdom_internal_elements.size());
