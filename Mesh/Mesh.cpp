@@ -1367,6 +1367,7 @@ void Mesh::ConstructSubDomain_by_Nodes(const string fname, const string fpath, c
 
 	for (long i=0; i<n_all_nodes; i++)
 	{
+		this->node_vector[i]->original_index = this->node_vector[i]->index;
 		if (this->node_vector[i]->index < this->NodesNumber_Linear)
 			this->node_vector[i]->isQuadratic(true);
 	}
@@ -1387,11 +1388,10 @@ void Mesh::ConstructSubDomain_by_Nodes(const string fname, const string fpath, c
 		if (num_parts==1) {
 			for (long j = 0; j < n_all_nodes; j++) {
 				internal_nodes.push_back(node_vector[j]);
-				//if (node_vector[j]->isQuadratic())
-                if (node_vector[j]->index >= NodesNumber_Linear)
+				if (node_vector[j]->index >= NodesNumber_Linear)
 					internal_quad_nodes.push_back(node_vector[j]);
 				sbd_nodes.push_back(node_vector[j]);
-                internal_nodes[j]->local_index = j;
+				internal_nodes[j]->local_index = j;
 			}
 			for (long j = 0; j < n_all_elements; j++)
 				subdom_internal_elements.push_back(elem_vector[j]);
@@ -1510,8 +1510,8 @@ void Mesh::ConstructSubDomain_by_Nodes(const string fname, const string fpath, c
 		for (long i = start; i < end; i++)
 		{
 			Node* a_node = sbd_nodes[i];
-			//a_node->index = a_node->local_index;
-			a_node->Write(os_subd);
+			a_node->WriteWithEqsID(os_subd);
+			//a_node->Write(os_subd);
 		}
 	}
 

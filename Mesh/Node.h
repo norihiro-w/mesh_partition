@@ -22,17 +22,11 @@ class Node:public Grain
    public:
       Node(const int Index):Grain(Index)
       {
-         Coordinate = new double[3];
          _is_quadratic = false;
       }
       Node(const int Index, const double x,
            const double y, const double z=0.0);
-      ~Node()
-      {
-         delete [] Coordinate;
-         Coordinate = NULL;
-         ElementsRelated.resize(0);
-      }
+	  ~Node() {}
 
       // Operator
       void operator = (const Node& n);
@@ -67,7 +61,7 @@ class Node:public Grain
       {
          return Coordinate[2];
       }
-      double *getCoordinates() const
+      double const* getCoordinates() const
       {
          return  Coordinate;
       }
@@ -86,13 +80,15 @@ class Node:public Grain
 
       // Output
       void Write(std::ostream& os = std::cout) const;
+	  void WriteWithEqsID(std::ostream& os = std::cout) const;
       void WriteCoordinates(std::ostream& os = std::cout) const;
 
       std::vector<long> const& getConnectedElementIDs() const { return ElementsRelated; }
       std::vector<long> & getConnectedElementIDs() { return ElementsRelated; }
 
    private:
-      double *Coordinate;
+	  double Coordinate[3] = {};
+	  long original_index = 0;
       long local_index; // For domain decomposition
       bool _is_quadratic;
       std::vector<long>  ElementsRelated;
