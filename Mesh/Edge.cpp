@@ -37,7 +37,7 @@ void Edge::operator = (Edge& ed)
 {
    index = ed.index;
    mark = ed.mark;
-   for(int i=0; i<nodes_of_edges.Size(); i++)
+   for(size_t i=0; i<nodes_of_edges.size(); i++)
       nodes_of_edges[i] = ed.nodes_of_edges[i];
 }
 //    WW. 06.2005
@@ -72,7 +72,7 @@ bool Edge::operator == (Edge& ed)
 void Edge::Write(ostream& osm) const
 {
    osm<<"Edge: "<< index<<endl;
-   for(int i=0; i<nodes_of_edges.Size(); i++)
+   for(size_t i=0; i<nodes_of_edges.size(); i++)
    {
       osm<<"Node: "<< i<<endl;
       nodes_of_edges[i]->Write(osm);

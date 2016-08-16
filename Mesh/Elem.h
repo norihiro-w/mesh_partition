@@ -3,8 +3,6 @@
 
 #include<vector>
 
-#include"vec.h"
-#include"SymMatrix.h"
 #include "Grain.h"
 #include "Node.h"
 
@@ -78,17 +76,17 @@ class Elem:public Grain
       // Nodes
       void getNodeIndeces(long  *node_index) const
       {
-         for (int i=0; i< (int) nodes.Size(); i++)
+         for (int i=0; i< (int) nodes.size(); i++)
             node_index[i]= nodes[i]->index;
       }
       long getNodeIndex(const int loc_lndex) const
       {
          return nodes[loc_lndex]->index;
       }
-      void setNodes(Math_Group::vec<Node*>&  ele_nodes, const bool ReSize=false);
-      void getNodes(Math_Group::vec<Node*>&  ele_nodes)
+      void setNodes(std::vector<Node*>&  ele_nodes, const bool ReSize=false);
+      void getNodes(std::vector<Node*>&  ele_nodes)
       {
-         for (int i=0; i< (int) nodes.Size(); i++)
+         for (int i=0; i< (int) nodes.size(); i++)
             ele_nodes[i]= nodes[i];
       }
       Node* getNode(const int i)
@@ -103,7 +101,7 @@ class Elem:public Grain
 
 #ifdef BUILD_MESH_EDGE
       // Edges
-      void getEdges(Math_Group::vec<Edge*>&  ele_edges)
+      void getEdges(std::vector<Edge*>&  ele_edges)
       {
          for (int i=0; i<nedges; i++) ele_edges[i]= edges[i];
       }
@@ -111,18 +109,18 @@ class Elem:public Grain
       {
          return edges[index];
       }
-      void setEdges(Math_Group::vec<Edge*>&  ele_edges)
+      void setEdges(std::vector<Edge*>&  ele_edges)
       {
          for (int i=0; i<nedges; i++) edges[i]= ele_edges[i];
       }
 
-      void setEdges_Orientation(Math_Group::vec<int>&  ori_edg)
+      void setEdges_Orientation(std::vector<int>&  ori_edg)
       {
          for (int i=0; i<nedges; i++) edges_orientation[i]= ori_edg[i];
       }
 #endif
       // Neighbors
-      void setNeighbors(Math_Group::vec<Elem*>&  ele_neighbors)
+      void setNeighbors(std::vector<Elem*>&  ele_neighbors)
       {
          for (int i=0; i< nfaces; i++) neighbors[i] = ele_neighbors[i];
       }
@@ -130,7 +128,7 @@ class Elem:public Grain
       {
          neighbors[LocalIndex] = ele_neighbor;
       }
-      void getNeighbors(Math_Group::vec<Elem*>&  ele_neighbors)
+      void getNeighbors(std::vector<Elem*>&  ele_neighbors)
       {
          for (int i=0; i< nfaces; i++) ele_neighbors[i]= neighbors[i];
       }
@@ -149,7 +147,7 @@ class Elem:public Grain
       }
       void AllocateLocalIndexVector()
       {
-         locnodes_index.resize(nodes.Size());
+         locnodes_index.resize(nodes.size());
       }
       void setDomainIndex(const int dom)
       {
@@ -199,15 +197,15 @@ class Elem:public Grain
       // 1 Line, 2 Quad, 3 Hex, 4 Tri, 5 Tet, 6 Pris
       ElemType ele_Type;
       Elem* Owner;
-      //Math_Group::vec<long>   nodes_index;
-      Math_Group::vec<long>   locnodes_index;
-      Math_Group::vec<Node*>  nodes;
+      //std::vector<long>   nodes_index;
+      std::vector<long>   locnodes_index;
+      std::vector<Node*>  nodes;
 
 #ifdef BUILD_MESH_EDGE
-      Math_Group::vec<Edge*>  edges;
-      Math_Group::vec<int>  edges_orientation;
+      std::vector<Edge*>  edges;
+      std::vector<int>  edges_orientation;
 #endif
-      Math_Group::vec<Elem*>  neighbors;
+      std::vector<Elem*>  neighbors;
       //vec<Elem*>  sons;
   
       int nnodes_gl; //> number of ghost nodes for linear element 

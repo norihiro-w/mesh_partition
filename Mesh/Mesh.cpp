@@ -4,6 +4,7 @@
 #include <cfloat>
 #include <cmath>
 #include <cstdlib>
+#include <fstream>
 #include <iomanip>
 #include <limits>
 #include <sstream>
@@ -21,7 +22,6 @@
 namespace Mesh_Group
 {
 using namespace std;
-using namespace Math_Group;
 
 Mesh::Mesh(bool quad)
 {
@@ -149,23 +149,22 @@ void Mesh::ConstructGrid()
 {
 	int faceIndex_loc0[10];
 	int faceIndex_loc[10];
-	vec<Node*> e_nodes0(20);
+	std::vector<Node*> e_nodes0(20);
 	long node_index_glb[20];
 	long node_index_glb0[20];
 
 #ifdef BUILD_MESH_EDGE
 	int edgeIndex_loc0[3];
 	int edgeIndex_loc[3];
-	vec<int> Edge_Orientation(15);
-	vec<Edge*> Edges(15);
-	vec<Edge*> Edges0(15);
-	Edge_Orientation = 1;
+	std::vector<int> Edge_Orientation(15, 1);
+	std::vector<Edge*> Edges(15);
+	std::vector<Edge*> Edges0(15);
 #endif
-	vec<Elem*> Neighbors(15);
-	vec<Elem*> Neighbors0(15);
+	std::vector<Elem*> Neighbors(15);
+	std::vector<Elem*> Neighbors0(15);
 
-	vec<Node*> e_edgeNodes0(3);
-	vec<Node*> e_edgeNodes(3);
+	std::vector<Node*> e_edgeNodes0(3);
+	std::vector<Node*> e_edgeNodes(3);
 
 	clock_t start, finish;
 	start = clock();
@@ -485,8 +484,8 @@ void Mesh::GenerateHighOrderNodes()
 	start = clock();
 
 	//
-	vec<Node*> e_nodes0(20);
-	vec<Node*> e_nodes(20);
+	std::vector<Node*> e_nodes0(20);
+	std::vector<Node*> e_nodes(20);
 	//----------------------------------------------------------------------
 	NodesNumber_Linear = (long) node_vector.size();
 	// Loop over elements
@@ -529,7 +528,7 @@ void Mesh::GenerateHighOrderNodes()
 					auto nedges = thisElem->getEdgesNumber();
 
 					// If this element already proccessed
-					if (thisElem->nodes.Size() == thisElem->getNodesNumberHQ())
+					if (thisElem->nodes.size() == thisElem->getNodesNumberHQ())
 					{
 						// Edges of neighbors
 						for (int ii = 0; ii < nedges; ii++)

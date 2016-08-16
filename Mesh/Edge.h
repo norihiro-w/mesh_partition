@@ -1,7 +1,7 @@
 #ifndef Edge_INC
 #define Edge_INC
 
-#include "vec.h"
+#include <vector>
 
 #include "Grain.h"
 
@@ -24,7 +24,7 @@ class Edge:public Grain
       ~Edge();
 
       // Access members
-      void setNodes( Math_Group::vec<Node*>& Nodes)
+      void setNodes( std::vector<Node*>& Nodes)
       {
          for(int i=0; i<3; i++)  nodes_of_edges[i] = Nodes[i];
       }
@@ -32,7 +32,7 @@ class Edge:public Grain
       {
          nodes_of_edges[index] = aNode;
       }
-      void getNodes( Math_Group::vec<Node*>& Nodes)
+      void getNodes( std::vector<Node*>& Nodes)
       {
          for(int i=0; i<3; i++)  Nodes[i] = nodes_of_edges[i];
       }
@@ -56,7 +56,7 @@ class Edge:public Grain
       // High order
       bool quadratic;
 
-      Math_Group::vec<Node*>  nodes_of_edges;
+      std::vector<Node*>  nodes_of_edges;
       friend class Elem;
 };
 

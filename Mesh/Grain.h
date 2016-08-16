@@ -1,8 +1,8 @@
 #ifndef Grain_INC
 #define Grain_INC
 
-#include<string>
-#include<iostream>
+#include <string>
+#include <iostream>
 
 //------------------------------------------------------
 //   Topology declartion of geometrical element.
@@ -21,8 +21,8 @@ class Grain
       Grain(const int id);
       virtual  ~Grain() {}
       // Operator
-      virtual void operator = (const Grain & g) {}
-      virtual bool operator == (const Grain & g)
+      virtual void operator = (const Grain & ) {}
+      virtual bool operator == (const Grain & )
       {
          return false;
       }
@@ -42,7 +42,7 @@ class Grain
       }
 
       // Output
-      virtual void output(std::ostream& os = std::cout) const {};
+      virtual void output(std::ostream& os = std::cout) const { (void)os; }
    protected:
       long index;
       // Towards special purpose,

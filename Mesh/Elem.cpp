@@ -14,7 +14,6 @@ namespace Mesh_Group
 {
 
 using namespace std;
-using namespace Math_Group;
 
 
 int EdgeLocalNodeIndex [] =
@@ -163,8 +162,7 @@ Elem::  Elem( const int Index,  Elem* onwer, const int Face):
    // Face edges
    ne = Owner->getEdgesNumber();
    edges.resize(nnodes);
-   edges_orientation.resize(nnodes);
-   edges_orientation = 1;
+   edges_orientation.resize(nnodes, 1);
    for(i=0; i<nnodes; i++)
    {
       k = (i+1)%nnodes;
@@ -650,7 +648,7 @@ void Elem::WriteIndex(ostream& os) const
 void Elem::Write_index(ostream& os) const
 {
     string deli = " ";
-   if(nodes.Size()>0)
+   if(nodes.size()>0)
    {
       for(int i=0; i<getNodesNumber(quadratic); i++)
          os<<nodes[i]->index+1<<deli;
@@ -669,7 +667,7 @@ void Elem::WriteAll(ostream& os) const
    os<<index<<deli<<PatchIndex<<deli<<getName()<<deli;
    //if(index==0)
    os<<"Index X Y Z: "<<endl;
-   for(int i=0; i<nodes.Size(); i++)
+   for(size_t i=0; i<nodes.size(); i++)
    {
       const Node *anode = nodes[i];  
       os<<anode->index
@@ -700,7 +698,7 @@ void Elem::MarkingNodes(bool maker)
 
 
 //    WW. 06.2005
-void Elem::setNodes(vec<Node*>&  ele_nodes, const bool ReSize)
+void Elem::setNodes(std::vector<Node*>&  ele_nodes, const bool ReSize)
 {
    int SizeV = nnodes;
    if(quadratic) SizeV = nnodesHQ;

@@ -15,18 +15,14 @@ IF(USE_METIS_SOURCE)
 	ADD_EXECUTABLE(partmesh-egs partition.cpp)
 
 	target_link_libraries(partmesh-egs
-	   Math
 	   Mesh		
 	   METIS_lib
        metis
 	)
 ELSE() 
-        ADD_EXECUTABLE(partmesh-egs partition.cpp)
+	ADD_EXECUTABLE(partmesh-egs partition.cpp)
 	target_link_libraries(partmesh-egs
-		Math
 		Mesh
 	)	
 ENDIF()
-
-
 
