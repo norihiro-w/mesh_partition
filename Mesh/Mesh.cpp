@@ -1038,9 +1038,13 @@ void Mesh::outputRenumedVTK(const std::string fname, const std::string s_nparts,
 {
 	std::string f_iparts = fname + "_renum_" + s_nparts + ".msh";
 	ofstream os(f_iparts.c_str(), ios::out | ios::trunc);
+	//os.setf(ios::scientific, std::ios::floatfield);
+	os.precision(15);
 	// Output renumbered mesh
-	os << "#FEM_MSH\n   $PCS_TYPE\n    NULL" << endl;
-	os << " $NODES\n" << NodesNumber_Quadratic << endl;
+	os << "#FEM_MSH\n";
+	os << " $PCS_TYPE\n";
+	os << "  NO_PCS\n";
+	os << " $NODES\n  " << NodesNumber_Quadratic << endl;
 	std::vector<Node*> vec_sorted_nodes(NodesNumber_Quadratic);
 	for (int idom = 0; idom < num_parts; idom++)
 	{
@@ -1062,7 +1066,7 @@ void Mesh::outputRenumedVTK(const std::string fname, const std::string s_nparts,
 	for (size_t i = 0; i < vec_sorted_nodes.size(); i++)
 		vec_sorted_nodes[i]->Write(os);
 	sbd_nodes.clear();
-	os << " $ELEMENTS\n" << elem_vector.size() << endl;
+	os << " $ELEMENTS\n  " << elem_vector.size() << endl;
 	for (size_t e = 0; e < elem_vector.size(); e++)
 	{
 		elem_vector[e]->WriteGSmsh(os, is_quad);
