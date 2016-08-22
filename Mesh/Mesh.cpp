@@ -1110,6 +1110,7 @@ void Mesh::findElementsInSubDomain(const vector<Node*>& internal_nodes, vector<E
 			a_elem->Marking(true);
 			vector<int> ng_nodes; // non ghost nodes in ghost elements
 			vector<int> g_nodes; // ghost nodes in ghost elements
+			vector<int> g_nodes_L; // ghost linear nodes in ghost elements
 			vector<int> ngl_nodes; // ghost nodes in ghost elements
 			for (int kk = 0; kk < a_elem->getNodesNumber(useQuadratic); kk++)
 			{
@@ -1117,8 +1118,11 @@ void Mesh::findElementsInSubDomain(const vector<Node*>& internal_nodes, vector<E
 					ng_nodes.push_back(kk);
 					if (a_elem->getNode(kk)->isQuadratic())
 						ngl_nodes.push_back(kk);
-				} else
+				} else {
 					g_nodes.push_back(kk);
+					if (a_elem->getNode(kk)->isQuadratic())
+						g_nodes_L.push_back(kk);
+				}
 			}
 			// All nodes of this element are inside this subdomain
 			if (g_nodes.empty())
@@ -1129,11 +1133,15 @@ void Mesh::findElementsInSubDomain(const vector<Node*>& internal_nodes, vector<E
 			{
 				subdom_ghost_elements.push_back(a_elem);
 				// set ghost nodes
-				const int nn_gl = static_cast<int>(ng_nodes.size());
-				a_elem->nnodes_gl = ngl_nodes.size();
-				a_elem->ghost_nodes.resize(nn_gl);
-				for (int kk = 0; kk < nn_gl; kk++)
-					a_elem->ghost_nodes[kk] = ng_nodes[kk];
+				a_elem->nnodes_gl = g_nodes_L.size();
+				a_elem->ghost_nodes.resize(g_nodes.size());
+				for (int kk = 0; kk < g_nodes.size(); kk++)
+					a_elem->ghost_nodes[kk] = g_nodes[kk];
+//				const int nn_gl = static_cast<int>(ng_nodes.size());
+//				a_elem->nnodes_gl = ngl_nodes.size();
+//				a_elem->ghost_nodes.resize(nn_gl);
+//				for (int kk = 0; kk < nn_gl; kk++)
+//					a_elem->ghost_nodes[kk] = ng_nodes[kk];
 			}
 		}
 	}
@@ -1157,7 +1165,7 @@ void Mesh::findGhostNodesInSubDomain(const vector<Elem*>& subdom_ghost_elements,
 		for (int k = 0; k < a_elem->getNodesNumber(is_quad); k++)
 		{
 			Node* a_node = a_elem->nodes[k];
-			if (a_node->getStatus())
+			if (!a_node->getStatus())
 				// ghost nodes are unmarked
 				continue;
 
