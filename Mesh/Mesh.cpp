@@ -1340,7 +1340,7 @@ void Mesh::ConstructSubDomain_by_Nodes(const string fname, const string fpath, c
 	fstream os_subd(name_f.c_str(), ios::out | ios::trunc);
 	const std::string str_header = "Subdomain mesh "
 			"(Domain nodes(quad); Domain nodes(linear); Inner elements; Ghost elements; Internal nodes(linear); Internal nodes(quad)) "
-			"Global nodes(linear); Global nodes(quad); "
+			"Global nodes(linear); Global nodes(quad); Global elements; "
 			"Total integer variables of elements;Total integer variables of ghost elements  ";
 //   name_f = "Subdomain mesh "
 //           "(Nodes;  Nodes_linear; Elements; Ghost elements; Nodes of Linear elements; Nodes of quadratic elements) "
@@ -1451,7 +1451,11 @@ void Mesh::ConstructSubDomain_by_Nodes(const string fname, const string fpath, c
 		//----------------------------------------------------------------------------------
 		string dom_str(number2str(idom));
 		const std::string deli(" ");
-		os_subd << size_sbd_nodes << deli << size_sbd_nodes - internal_quad_nodes.size() - dom_ghost_quad_nodes.size() << deli << subdom_internal_elements.size() << deli << subdom_ghost_elements.size() << deli << internal_nodes.size() - internal_quad_nodes.size() << deli << internal_nodes.size() << deli << NodesNumber_Linear << deli << NodesNumber_Quadratic << deli << nmb_element_idxs << deli << nmb_element_idxs_g << endl;
+		os_subd << size_sbd_nodes << deli << size_sbd_nodes - internal_quad_nodes.size() - dom_ghost_quad_nodes.size()
+				<< deli << subdom_internal_elements.size() << deli << subdom_ghost_elements.size() << deli
+				<< internal_nodes.size() - internal_quad_nodes.size() << deli << internal_nodes.size() << deli
+				<< NodesNumber_Linear << deli << NodesNumber_Quadratic << deli << this->elem_vector.size() << deli
+				<< nmb_element_idxs << deli << nmb_element_idxs_g << endl;
 
 		position_node_file[idom] = os_subd.tellp();
 		//os_subd<<"Nodes"<<endl;
