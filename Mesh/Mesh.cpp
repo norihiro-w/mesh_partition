@@ -1435,11 +1435,10 @@ void Mesh::ConstructSubDomain_by_Nodes(const string fname, const string fpath, c
 
 		long nmb_element_idxs = 0, nmb_element_idxs_g = 0;
 		// Count the total integer variables of this subdomain
-		nmb_element_idxs = 3 * subdom_internal_elements.size();
+		nmb_element_idxs = 4 * subdom_internal_elements.size(); // global id, mat id, ele type, nr. nodes
 		for (size_t j = 0; j < subdom_internal_elements.size(); j++)
 			nmb_element_idxs += subdom_internal_elements[j]->getNodesNumber(is_quad);
-		//  mat index, element type, number of element, number of ghost nodes, number of ghost nodes of high order elements
-		nmb_element_idxs_g = 5 * subdom_ghost_elements.size();
+		nmb_element_idxs_g = 6 * subdom_ghost_elements.size(); // above + nr. linear ghost nodes, nr. total ghost nodes
 		for (size_t j = 0; j < subdom_ghost_elements.size(); j++)
 		{
 			nmb_element_idxs_g += subdom_ghost_elements[j]->getNodesNumber(is_quad);
