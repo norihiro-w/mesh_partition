@@ -1911,6 +1911,12 @@ void Mesh::ReadGridGeoSys(istream& is)
 		 */
 		//....................................................................
 		//....................................................................
+		if (line_string.find("$AXISYMMETRY") != string::npos)   // subkeyword found
+		{
+			axisymmetry = true;
+			continue;
+		}
+		//....................................................................
 		if (line_string.find("$NODES") != string::npos)   // subkeyword found
 		{
 			is >> no_nodes >> ws;
