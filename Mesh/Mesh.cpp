@@ -1147,6 +1147,13 @@ void Mesh::findElementsInSubDomain(const vector<Node*>& internal_nodes, vector<E
 	}
 }
 
+template <typename T>
+static void make_unique(std::vector<T> &vec)
+{
+	std::sort(vec.begin(), vec.end());
+	vec.erase(std::unique(vec.begin(), vec.end()), vec.end());
+}
+
 void Mesh::findGhostNodesInSubDomain(const vector<Elem*>& subdom_ghost_elements, const bool is_quad, vector<Node*>& dom_ghost_linear_nodes, vector<Node*>& dom_ghost_quad_nodes)
 {
 	for (size_t j = 0; j < subdom_ghost_elements.size(); j++)
@@ -1176,6 +1183,9 @@ void Mesh::findGhostNodesInSubDomain(const vector<Elem*>& subdom_ghost_elements,
 				dom_ghost_quad_nodes.push_back(a_node);
 		}
 	}
+
+	make_unique(dom_ghost_linear_nodes);
+	make_unique(dom_ghost_quad_nodes);
 }
 
 long Mesh::addSubDomainNodes(long node_id_shift, const vector<Node*>& internal_nodes, const vector<Node*>& internal_quad_nodes, const vector<Node*>& dom_ghost_linear_nodes, const vector<Node*>& dom_ghost_quad_nodes, vector<Node*>& sbd_nodes)
