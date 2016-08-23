@@ -1355,7 +1355,10 @@ void Mesh::ConstructSubDomain_by_Nodes(const string fname, const string fpath, c
 //            "Nodes of Linear whole elements; Nodes of whole quadratic elements; "
 //       "Total integer variables of elements;Total integer variables of ghost elements  ";
 	os_subd << str_header << endl;
-	os_subd << num_parts << endl;
+	os_subd << num_parts;
+	if (this->axisymmetry)
+		os_subd << " AXISYMMETRY";
+	os_subd << endl;
 	setw(14);
 	os_subd.precision(14);
 	//os_subd.setf(ios::fixed, ios::scientific);

@@ -100,6 +100,7 @@ int main(int argc, char* argv[])
 
    bool quad = false;
    bool out_subdom = false;
+   bool axisymmetry = false;
 
    //ios::pos_type position;
 
@@ -120,17 +121,13 @@ int main(int argc, char* argv[])
             part_type = by_element;
          else if(s_buff.compare("-n") == 0)
             part_type = by_node;
-
-         if(s_buff.compare("-q") == 0)
+         else if(s_buff.compare("-q") == 0)
             quad = true;
-
-         if(s_buff.compare("-odom") == 0)
-         {
+         else if(s_buff.compare("-a") == 0)
+            axisymmetry = true;
+         else if(s_buff.compare("-odom") == 0)
             out_subdom = true;
-         }
-
-         // Number of partitions
-         if(s_buff.find("-np")!=string::npos)
+         else if(s_buff.find("-np")!=string::npos)
          {
             //size_t pos;
             //pos = s_buff.find_first_of("p");
@@ -139,15 +136,9 @@ int main(int argc, char* argv[])
             nparts = atoi( argv[i+1]);
             str_nparts =  argv[i+1];
          }
-
-         // Number of partitions
-         if(s_buff.find("-mat")!=string::npos)
-         {
+         else if(s_buff.find("-mat")!=string::npos)
             mat_file_name = argv[i+1];
-         }
-
-
-         if(s_buff.find("ogs2metis")!=string::npos)
+         else if(s_buff.find("ogs2metis")!=string::npos)
          {
             this_task = ogs2metis;
          }
@@ -316,6 +307,8 @@ int main(int argc, char* argv[])
 
          break;
       case metis2ogs:
+          if (axisymmetry)
+             a_mesh->isAxisymmetry(true);
           if(quad)
           {
              cout<<"\n***Construct linear mesh"<<endl;

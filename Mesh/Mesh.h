@@ -48,6 +48,9 @@ public:
 	{
 		useQuadratic = is_quad;
 	}
+
+	void isAxisymmetry(bool f) { axisymmetry = f; }
+
 private:
 	int readMaterialDataFile(const std::string &fpath, const std::string &mat_fname, std::vector<std::string> &m_datanames, int num_data, std::vector<std::string> &m_headers, std::vector<size_t> &m_header_marker_per_data, std::vector<double> &m_ele_val);
 	void findInternalNodes(const std::vector<long> &dom_idx, const int idom, std::vector<bool> &sdom_marked, std::vector<Node*> &internal_quad_nodes, std::vector<Node*> &internal_nodes);
