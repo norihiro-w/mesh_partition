@@ -100,7 +100,6 @@ int main(int argc, char* argv[])
 
    bool quad = false;
    bool out_subdom = false;
-   bool axisymmetry = false;
 
    //ios::pos_type position;
 
@@ -123,8 +122,6 @@ int main(int argc, char* argv[])
             part_type = by_node;
          else if(s_buff.compare("-q") == 0)
             quad = true;
-         else if(s_buff.compare("-a") == 0)
-            axisymmetry = true;
          else if(s_buff.compare("-odom") == 0)
             out_subdom = true;
          else if(s_buff.find("-np")!=string::npos)
@@ -307,8 +304,6 @@ int main(int argc, char* argv[])
 
          break;
       case metis2ogs:
-          if (axisymmetry)
-             a_mesh->isAxisymmetry(true);
           if(quad)
           {
              cout<<"\n***Construct linear mesh"<<endl;
