@@ -527,11 +527,12 @@ void Mesh::GenerateHighOrderNodes()
 	bool hasLines = false;
 	for (long e = 0; e < e_size; e++)
 	{
-		auto thisElem0 = elem_vector[e];
+		Elem* thisElem0 = elem_vector[e];
 		if (thisElem0->getElementType() == Mesh_Group::line) {
 			hasLines = true;
 			continue;
 		}
+		thisElem0->setOrder(true);
 		auto nnodes0 = thisElem0->nnodes; // Number of nodes for linear element
 		//thisElem0->GetNodeIndeces(node_index_glb0);
 		for (int i = 0; i < nnodes0; i++) // Nodes
