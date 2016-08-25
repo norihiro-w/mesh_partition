@@ -715,10 +715,90 @@ void Elem::setNodes(std::vector<Node*>&  ele_nodes, const bool ReSize)
 //   WW  08.2012
 void  Elem::getLocalIndices_EdgeNodes(const int Edge, int *EdgeNodes)
 {
+#if 0
    const int start_index  = EdgeLocalIndexArrayElemShift[ele_Type] + Edge*3; 	
    EdgeNodes[0] = EdgeLocalNodeIndex[start_index];
    EdgeNodes[1] = EdgeLocalNodeIndex[start_index + 1];
    EdgeNodes[2] = EdgeLocalNodeIndex[start_index + 2];
+#else
+
+	switch (ele_Type)
+	{
+		case line:
+			EdgeNodes[0] = 0;
+			EdgeNodes[1] = 1;
+			if (quadratic) EdgeNodes[2] = 2;
+			break;               // 1-D bar element
+		case quadri:  // 2-D quadrilateral element
+			EdgeNodes[0] = Edge;
+			EdgeNodes[1] = (Edge + 1) % 4;
+			if (quadratic) EdgeNodes[2] = EdgeNodes[0] + 4;
+			break;
+		case hex:  // 3-D hexahedral element
+			if (Edge < 8)
+			{
+				EdgeNodes[0] = Edge;
+				EdgeNodes[1] = (Edge + 1) % 4 + 4 * (int)(Edge / 4);
+				if (quadratic) EdgeNodes[2] = EdgeNodes[0] + 8;
+			}
+			else
+			{
+				EdgeNodes[0] = Edge % 4;
+				EdgeNodes[1] = Edge % 4 + 4;
+				if (quadratic) EdgeNodes[2] = EdgeNodes[0] + 16;
+			}
+			break;
+		case tri:  // 2-D triagular element
+			EdgeNodes[0] = Edge;
+			EdgeNodes[1] = (Edge + 1) % 3;
+			if (quadratic) EdgeNodes[2] = EdgeNodes[0] + 3;
+			break;
+		case tet:  // 3-D tetrahedra
+			if (Edge < 3)
+			{
+				EdgeNodes[0] = Edge;
+				EdgeNodes[1] = (Edge + 1) % 3;
+			}
+			else
+			{
+				EdgeNodes[0] = 3;
+				EdgeNodes[1] = (Edge + 1) % 3;
+			}
+			if (quadratic) EdgeNodes[2] = Edge + 4;
+			break;
+		case prism:  // 3-D prismatic element
+			if (Edge < 6)
+			{
+				EdgeNodes[0] = Edge;
+				EdgeNodes[1] = (Edge + 1) % 3 + 3 * (int)(Edge / 3);
+			}
+			else
+			{
+				EdgeNodes[0] = Edge % 3;
+				EdgeNodes[1] = Edge % 3 + 3;
+			}
+			if (quadratic) EdgeNodes[2] = Edge + 6;
+			break;
+		case pyramid:  // 3-D pyramid element
+			if (Edge < 4)
+			{
+				EdgeNodes[0] = Edge;
+				EdgeNodes[1] = (Edge + 1) % 4;
+			}
+			else
+			{
+				EdgeNodes[0] = Edge % 4;
+				EdgeNodes[1] = 4;
+			}
+			if (quadratic) EdgeNodes[2] = Edge + 5;
+			break;
+		default:
+			std::cerr << "CElem::GetLocalIndicesOfEdgeNodes() - MshElemType "
+			             "not handled"
+			          << "\n";
+			break;
+	}
+#endif
 }
 
 /**************************************************************************
