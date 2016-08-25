@@ -756,6 +756,27 @@ void Mesh::GenerateHighOrderNodes()
 	finish = clock();
 	cout << "\n\tCPU time elapsed in generating high oder elements: " << (double) (finish - start) / CLOCKS_PER_SEC << "s" << endl;
 
+#if 0
+	{
+		std::ofstream os("mesh_q_partmesh.txt");
+		os << "--Nodes:\n";
+		os << NodesNumber_Linear << " " << NodesNumber_Quadratic << "\n";
+		for (long i=0; i<NodesNumber_Quadratic; i++)
+		{
+			Node* node = node_vector[i];
+			os << i << " " << node->getCoordinates()[0] << " " << node->getCoordinates()[1] << " " << node->getCoordinates()[2] << "\n";
+		}
+		os << "--Elements:\n";
+		for (size_t i=0; i<elem_vector.size(); i++)
+		{
+			Elem* ele = elem_vector[i];
+			os << i;
+			for (int j=0; j<ele->getNodesNumberHQ(); j++)
+				os << " " << ele->getNodeIndex(j);
+			os << "\n";
+		}
+	}
+#endif
 }
 
 void Mesh::ConstructSubDomain_by_Elements(const string fname, const int num_parts, const bool osdom)
